@@ -1,0 +1,198 @@
+<h2>상세 설계 ②③④ — Ingestion → Stream → Storage</h2>
+<p class="subtitle">API Gateway에서 S3 Data Lake까지의 서버리스 파이프라인</p>
+
+<!-- Ingestion Layer -->
+<div class="section">
+  <h3>② Ingestion — API Gateway (HTTP API)</h3>
+  <div style="display:flex;gap:12px;">
+    <div style="flex:1;padding:16px;background:rgba(210,153,34,0.1);border:1px solid #d29922;border-radius:8px;">
+      <h4 style="color:#d29922;margin:0 0 10px;">엔드포인트 설계</h4>
+      <pre style="font-size:11px;color:#c9d1d9;background:#0d1117;padding:12px;border-radius:6px;margin:0;overflow-x:auto;">POST /v1/events          ← 배치 이벤트 수신
+POST /v1/events/beacon   ← sendBeacon (페이지 이탈)
+GET  /v1/config          ← SDK 원격 설정 (샘플링률 등)
+GET  /v1/health          ← 헬스체크</pre>
+      <div style="font-size:12px;color:#c9d1d9;margin-top:12px;">
+        <strong>왜 HTTP API인가?</strong>
+        <ul style="margin:4px 0 0;padding-left:16px;">
+          <li>REST API 대비 <strong>70% 저렴</strong> ($1.00 vs $3.50 / 백만 요청)</li>
+          <li>지연 시간 더 낮음 (~10ms vs ~30ms)</li>
+          <li>CORS, 스테이지 지원</li>
+        </ul>
+      </div>
+    </div>
+    <div style="flex:1;padding:16px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:8px;">
+      <h4 style="color:#58a6ff;margin:0 0 10px;">인증 & 보안</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <p style="margin:0 0 8px;"><strong>API Key 인증:</strong></p>
+        <ul style="margin:0 0 10px;padding-left:16px;">
+          <li>앱별 API Key 발급 (web-prod, ios-prod 등)</li>
+          <li>Usage Plan으로 Rate Limit 설정</li>
+          <li>Key는 공개 클라이언트에 포함 (비밀이 아님)</li>
+        </ul>
+        <p style="margin:0 0 8px;"><strong>남용 방지:</strong></p>
+        <ul style="margin:0;padding-left:16px;">
+          <li>Rate Limit: 1,000 req/s per key</li>
+          <li>Payload 크기 제한: 512KB</li>
+          <li>WAF: Bot 탐지, IP 기반 제한</li>
+          <li>Origin 검증 (Web — Referer/Origin 헤더)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stream Processing Layer -->
+<div class="section" style="margin-top:20px;">
+  <h3>③ Stream Processing — Kinesis Firehose + Lambda</h3>
+  <div class="mockup">
+    <div class="mockup-header">데이터 플로우 상세</div>
+    <div class="mockup-body" style="padding:20px;background:#0d1117;">
+      <div style="display:flex;align-items:stretch;gap:8px;font-size:11px;min-width:650px;">
+        <!-- Step 1 -->
+        <div style="flex:1;background:#2a2a1a;border:1px solid #d29922;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-weight:600;color:#d29922;">API Gateway</div>
+          <div style="color:#8b949e;margin-top:4px;">Integration:<br>Kinesis Firehose 직접 연결<br>(Lambda Proxy 불필요)</div>
+        </div>
+        <div style="display:flex;align-items:center;color:#484f58;">→</div>
+        <!-- Step 2 -->
+        <div style="flex:1.2;background:#2a1a1a;border:1px solid #f85149;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-weight:600;color:#f85149;">Firehose</div>
+          <div style="color:#8b949e;margin-top:4px;">버퍼: 5MB or 60초<br>Lambda Transform 호출<br>실패 → Error S3 Bucket</div>
+        </div>
+        <div style="display:flex;align-items:center;color:#484f58;">→</div>
+        <!-- Step 3 -->
+        <div style="flex:1.3;background:#2a1a3a;border:1px solid #a371f7;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-weight:600;color:#a371f7;">Lambda Transform</div>
+          <div style="color:#8b949e;margin-top:4px;">① 스키마 검증<br>② GeoIP (MaxMind DB)<br>③ UA Parsing<br>④ Session Stitching<br>⑤ Parquet 변환 불필요*</div>
+        </div>
+        <div style="display:flex;align-items:center;color:#484f58;">→</div>
+        <!-- Step 4 -->
+        <div style="flex:1.2;background:#1a2a3a;border:1px solid #58a6ff;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-weight:600;color:#58a6ff;">S3 (Parquet)</div>
+          <div style="color:#8b949e;margin-top:4px;">Firehose 내장<br>Parquet 변환 사용<br>동적 파티셔닝</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;padding:12px;background:rgba(163,113,247,0.1);border:1px solid #a371f7;border-radius:8px;">
+    <h4 style="color:#a371f7;margin:0 0 6px;">Lambda Transform 상세</h4>
+    <div style="display:flex;gap:16px;font-size:12px;color:#c9d1d9;">
+      <div style="flex:1;">
+        <strong>런타임:</strong> Python 3.12<br>
+        <strong>메모리:</strong> 256MB<br>
+        <strong>타임아웃:</strong> 60초<br>
+        <strong>동시성:</strong> Firehose가 자동 관리
+      </div>
+      <div style="flex:1.5;">
+        <strong>GeoIP Enrichment 방식:</strong>
+        <ul style="margin:4px 0 0;padding-left:16px;">
+          <li>MaxMind GeoLite2 DB를 Lambda Layer로 패키징</li>
+          <li>IP → Country/City/Region 변환 후 IP 폐기</li>
+          <li>DB 월 1회 자동 업데이트 (EventBridge + Lambda)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;padding:12px;background:rgba(46,160,67,0.1);border:1px solid #2ea043;border-radius:8px;">
+    <h4 style="color:#2ea043;margin:0 0 6px;">💡 핵심 최적화: API Gateway → Firehose 직접 연결</h4>
+    <div style="font-size:12px;color:#c9d1d9;">
+      API Gateway의 <strong>Service Integration</strong>을 사용하면 수집 Lambda 없이 Firehose에 직접 전송 가능합니다.
+      이벤트 수신에 Lambda를 쓰지 않으므로 <strong>비용 절감 + 지연 감소 + 콜드 스타트 제거</strong>.
+      Transform Lambda는 Firehose 내부에서만 호출됩니다.
+    </div>
+  </div>
+</div>
+
+<!-- Storage Layer -->
+<div class="section" style="margin-top:20px;">
+  <h3>④ Storage — S3 Data Lake</h3>
+  <div style="display:flex;gap:12px;">
+    <div style="flex:1;padding:16px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:8px;">
+      <h4 style="color:#58a6ff;margin:0 0 10px;">버킷 구조 & 파티셔닝</h4>
+      <pre style="font-size:11px;color:#c9d1d9;background:#0d1117;padding:12px;border-radius:6px;margin:0;overflow-x:auto;">s3://rum-data-lake/
+├── raw/                          ← Firehose 출력
+│   └── platform=web/
+│       └── year=2026/
+│           └── month=04/
+│               └── day=01/
+│                   └── hour=09/
+│                       └── events-001.parquet
+├── aggregated/                   ← 집계 Lambda 출력
+│   ├── hourly/
+│   │   └── metric=cwv/
+│   │       └── 2026-04-01-09.parquet
+│   └── daily/
+│       └── metric=user_journey/
+│           └── 2026-04-01.parquet
+├── errors/                       ← Firehose 실패 레코드
+└── config/                       ← SDK 원격 설정 JSON</pre>
+    </div>
+    <div style="flex:0.8;padding:16px;background:rgba(248,81,73,0.1);border:1px solid #f85149;border-radius:8px;">
+      <h4 style="color:#f85149;margin:0 0 10px;">S3 Lifecycle Policy</h4>
+      <table style="width:100%;font-size:12px;color:#c9d1d9;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">raw/</td>
+          <td>
+            0~90일: S3 Standard<br>
+            90일 후: 삭제
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">aggregated/</td>
+          <td>
+            0~90일: S3 Standard<br>
+            90~365일: S3 IA<br>
+            365일 후: Glacier
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;font-weight:600;">errors/</td>
+          <td>
+            30일 후: 삭제
+          </td>
+        </tr>
+      </table>
+
+      <div style="margin-top:16px;">
+        <h4 style="color:#f85149;margin:0 0 6px;">예상 용량 (DAU 5만)</h4>
+        <div style="font-size:12px;color:#c9d1d9;">
+          <div>일 이벤트: ~500만 건</div>
+          <div>Parquet 일 용량: ~<strong>500MB</strong></div>
+          <div>월 용량: ~<strong>15GB</strong></div>
+          <div>90일 raw: ~<strong>45GB</strong></div>
+          <div style="margin-top:4px;color:#8b949e;">(JSON 대비 ~80% 압축)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Glue Catalog -->
+<div style="margin-top:12px;padding:12px 16px;background:rgba(210,153,34,0.1);border:1px solid #d29922;border-radius:8px;">
+  <h4 style="color:#d29922;margin:0 0 6px;">Glue Data Catalog 테이블</h4>
+  <div style="display:flex;gap:16px;font-size:12px;color:#c9d1d9;">
+    <div style="flex:1;">
+      <strong>rum_events (raw)</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>Firehose 파티션 자동 등록</li>
+        <li>Athena에서 바로 쿼리 가능</li>
+      </ul>
+    </div>
+    <div style="flex:1;">
+      <strong>rum_hourly_metrics (aggregated)</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>시간별 집계 메트릭</li>
+        <li>대시보드 주 데이터 소스</li>
+      </ul>
+    </div>
+    <div style="flex:1;">
+      <strong>rum_daily_summary (aggregated)</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>일별 요약 (유저, 에러, 성능)</li>
+        <li>트렌드 분석용</li>
+      </ul>
+    </div>
+  </div>
+</div>

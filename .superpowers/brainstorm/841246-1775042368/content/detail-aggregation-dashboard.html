@@ -1,0 +1,272 @@
+<h2>상세 설계 ⑤⑥ — Aggregation + Dashboard & Alerting</h2>
+<p class="subtitle">주기적 집계와 Grafana 기반 시각화/알림 체계</p>
+
+<!-- Aggregation Layer -->
+<div class="section">
+  <h3>⑤ Aggregation — EventBridge + Lambda</h3>
+  <div class="mockup">
+    <div class="mockup-header">집계 파이프라인 플로우</div>
+    <div class="mockup-body" style="padding:20px;background:#0d1117;">
+      <div style="display:flex;flex-direction:column;gap:14px;font-size:11px;min-width:650px;">
+        <!-- Hourly -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:100px;text-align:right;color:#a371f7;font-weight:600;">매시간</div>
+          <div style="flex:1;display:flex;align-items:center;gap:8px;">
+            <div style="background:#2a1a3a;border:1px solid #a371f7;border-radius:6px;padding:8px 12px;">
+              <div style="color:#a371f7;font-weight:600;">EventBridge</div>
+              <div style="color:#8b949e;">cron(0 * * * ? *)</div>
+            </div>
+            <span style="color:#484f58;">→</span>
+            <div style="background:#2a1a3a;border:1px solid #a371f7;border-radius:6px;padding:8px 12px;">
+              <div style="color:#a371f7;font-weight:600;">Lambda: Hourly Aggregator</div>
+              <div style="color:#8b949e;">Athena 쿼리 → 집계 결과 → S3</div>
+            </div>
+            <span style="color:#484f58;">→</span>
+            <div style="background:#1a2a3a;border:1px solid #58a6ff;border-radius:6px;padding:8px 12px;">
+              <div style="color:#58a6ff;">s3://aggregated/hourly/</div>
+            </div>
+          </div>
+        </div>
+        <!-- Daily -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:100px;text-align:right;color:#2ea043;font-weight:600;">매일 01:00</div>
+          <div style="flex:1;display:flex;align-items:center;gap:8px;">
+            <div style="background:#1a3a2a;border:1px solid #2ea043;border-radius:6px;padding:8px 12px;">
+              <div style="color:#2ea043;font-weight:600;">EventBridge</div>
+              <div style="color:#8b949e;">cron(0 1 * * ? *)</div>
+            </div>
+            <span style="color:#484f58;">→</span>
+            <div style="background:#1a3a2a;border:1px solid #2ea043;border-radius:6px;padding:8px 12px;">
+              <div style="color:#2ea043;font-weight:600;">Lambda: Daily Aggregator</div>
+              <div style="color:#8b949e;">사용자 여정 / 에러 트렌드 / DAU</div>
+            </div>
+            <span style="color:#484f58;">→</span>
+            <div style="background:#1a2a3a;border:1px solid #58a6ff;border-radius:6px;padding:8px 12px;">
+              <div style="color:#58a6ff;">s3://aggregated/daily/</div>
+            </div>
+          </div>
+        </div>
+        <!-- Real-time alert -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:100px;text-align:right;color:#f85149;font-weight:600;">5분 간격</div>
+          <div style="flex:1;display:flex;align-items:center;gap:8px;">
+            <div style="background:#2a1a1a;border:1px solid #f85149;border-radius:6px;padding:8px 12px;">
+              <div style="color:#f85149;font-weight:600;">EventBridge</div>
+              <div style="color:#8b949e;">rate(5 minutes)</div>
+            </div>
+            <span style="color:#484f58;">→</span>
+            <div style="background:#2a1a1a;border:1px solid #f85149;border-radius:6px;padding:8px 12px;">
+              <div style="color:#f85149;font-weight:600;">Lambda: Alert Checker</div>
+              <div style="color:#8b949e;">에러 급증 / 성능 저하 감지</div>
+            </div>
+            <span style="color:#484f58;">→</span>
+            <div style="background:#2a2a1a;border:1px solid #d29922;border-radius:6px;padding:8px 12px;">
+              <div style="color:#d29922;">SNS → Slack / Email</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;gap:12px;">
+    <div style="flex:1;padding:14px;background:rgba(163,113,247,0.1);border:1px solid #a371f7;border-radius:8px;">
+      <h4 style="color:#a371f7;margin:0 0 8px;">Hourly 집계 항목</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <ul style="margin:0;padding-left:16px;">
+          <li>CWV 백분위 (p50, p75, p95, p99)</li>
+          <li>플랫폼별 에러 수 / 에러율</li>
+          <li>페이지/화면별 로딩 시간</li>
+          <li>API 엔드포인트별 응답 시간 / 에러율</li>
+          <li>활성 사용자 수 (세션 기반)</li>
+        </ul>
+      </div>
+    </div>
+    <div style="flex:1;padding:14px;background:rgba(46,160,67,0.1);border:1px solid #2ea043;border-radius:8px;">
+      <h4 style="color:#2ea043;margin:0 0 8px;">Daily 집계 항목</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <ul style="margin:0;padding-left:16px;">
+          <li>DAU / WAU / MAU</li>
+          <li>사용자 여정 (Top 경로, 이탈 지점)</li>
+          <li>신규 vs 재방문 비율</li>
+          <li>디바이스/OS/브라우저 분포</li>
+          <li>지역별 사용자 분포</li>
+          <li>에러 Top 10 (그룹핑)</li>
+        </ul>
+      </div>
+    </div>
+    <div style="flex:1;padding:14px;background:rgba(248,81,73,0.1);border:1px solid #f85149;border-radius:8px;">
+      <h4 style="color:#f85149;margin:0 0 8px;">Alert 조건 (5분 체크)</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <ul style="margin:0;padding-left:16px;">
+          <li>JS 에러율 > 5% (최근 5분)</li>
+          <li>API 에러율 > 10%</li>
+          <li>LCP p75 > 4초</li>
+          <li>앱 크래시율 > 1%</li>
+          <li>이벤트 수신량 급감 (파이프라인 장애)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard Layer -->
+<div class="section" style="margin-top:24px;">
+  <h3>⑥ Dashboard — Grafana + Athena</h3>
+
+  <!-- Grafana Setup -->
+  <div style="padding:14px;background:rgba(247,120,186,0.1);border:1px solid #f778ba;border-radius:8px;margin-bottom:12px;">
+    <h4 style="color:#f778ba;margin:0 0 8px;">Grafana 배포</h4>
+    <div style="display:flex;gap:16px;font-size:12px;color:#c9d1d9;">
+      <div style="flex:1;">
+        <strong>호스팅:</strong> ECS Fargate (1 Task)<br>
+        <strong>데이터 소스:</strong> Amazon Athena Plugin<br>
+        <strong>인증:</strong> ALB + Cognito (SSO)<br>
+        <strong>비용:</strong> ~$30/월 (0.5 vCPU, 1GB)
+      </div>
+      <div style="flex:1;">
+        <strong>대안: Amazon Managed Grafana</strong>
+        <ul style="margin:4px 0 0;padding-left:16px;">
+          <li>$9/editor/월 — 팀 규모에 따라 결정</li>
+          <li>운영 부담 제로</li>
+          <li>5명 이하면 Managed가 더 경제적</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Mockups -->
+  <div style="display:flex;gap:12px;">
+    <!-- Dashboard 1: CWV -->
+    <div style="flex:1;border:1px solid #30363d;border-radius:8px;overflow:hidden;">
+      <div style="background:#161b22;padding:8px 12px;font-size:12px;font-weight:600;color:#f778ba;border-bottom:1px solid #30363d;">
+        📊 Core Web Vitals
+      </div>
+      <div style="padding:12px;background:#0d1117;font-size:11px;color:#c9d1d9;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="background:#1a3a2a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">LCP p75</div>
+            <div style="font-size:18px;font-weight:bold;color:#2ea043;">2.1s</div>
+            <div style="color:#2ea043;font-size:10px;">Good</div>
+          </div>
+          <div style="background:#2a2a1a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">INP p75</div>
+            <div style="font-size:18px;font-weight:bold;color:#d29922;">180ms</div>
+            <div style="color:#d29922;font-size:10px;">Needs Improvement</div>
+          </div>
+          <div style="background:#1a3a2a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">CLS p75</div>
+            <div style="font-size:18px;font-weight:bold;color:#2ea043;">0.05</div>
+            <div style="color:#2ea043;font-size:10px;">Good</div>
+          </div>
+        </div>
+        <div style="background:#161b22;border-radius:4px;padding:8px;">
+          <div style="color:#8b949e;margin-bottom:4px;">LCP Trend (24h)</div>
+          <div style="display:flex;align-items:end;gap:2px;height:30px;">
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:60%;"></div>
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:55%;"></div>
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:70%;"></div>
+            <div style="flex:1;background:#d29922;border-radius:2px 2px 0 0;height:85%;"></div>
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:65%;"></div>
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:50%;"></div>
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:45%;"></div>
+            <div style="flex:1;background:#2ea043;border-radius:2px 2px 0 0;height:55%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard 2: Errors -->
+    <div style="flex:1;border:1px solid #30363d;border-radius:8px;overflow:hidden;">
+      <div style="background:#161b22;padding:8px 12px;font-size:12px;font-weight:600;color:#f778ba;border-bottom:1px solid #30363d;">
+        🚨 Error Monitoring
+      </div>
+      <div style="padding:12px;background:#0d1117;font-size:11px;color:#c9d1d9;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="background:#2a1a1a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">JS Error Rate</div>
+            <div style="font-size:18px;font-weight:bold;color:#f85149;">1.2%</div>
+          </div>
+          <div style="background:#1a3a2a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">App Crash Rate</div>
+            <div style="font-size:18px;font-weight:bold;color:#2ea043;">0.1%</div>
+          </div>
+        </div>
+        <div style="background:#161b22;border-radius:4px;padding:8px;">
+          <div style="color:#8b949e;margin-bottom:6px;">Top Errors</div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d;">
+            <span style="color:#f85149;">TypeError: null ref</span><span>342</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d;">
+            <span style="color:#f85149;">ChunkLoadError</span><span>128</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;">
+            <span style="color:#f85149;">API 500: /cart</span><span>87</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard 3: User Journey -->
+    <div style="flex:1;border:1px solid #30363d;border-radius:8px;overflow:hidden;">
+      <div style="background:#161b22;padding:8px 12px;font-size:12px;font-weight:600;color:#f778ba;border-bottom:1px solid #30363d;">
+        🧭 User Journey
+      </div>
+      <div style="padding:12px;background:#0d1117;font-size:11px;color:#c9d1d9;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="background:#1a2a3a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">DAU</div>
+            <div style="font-size:18px;font-weight:bold;color:#58a6ff;">48.2K</div>
+          </div>
+          <div style="background:#1a2a3a;border-radius:4px;padding:8px;text-align:center;">
+            <div style="color:#8b949e;">Avg Session</div>
+            <div style="font-size:18px;font-weight:bold;color:#58a6ff;">4m 32s</div>
+          </div>
+        </div>
+        <div style="background:#161b22;border-radius:4px;padding:8px;">
+          <div style="color:#8b949e;margin-bottom:6px;">Top Paths</div>
+          <div style="padding:3px 0;border-bottom:1px solid #21262d;">
+            Home → Products → Detail <span style="color:#2ea043;">38%</span>
+          </div>
+          <div style="padding:3px 0;border-bottom:1px solid #21262d;">
+            Home → Search → Detail <span style="color:#58a6ff;">24%</span>
+          </div>
+          <div style="padding:3px 0;">
+            Home → Cart → Checkout <span style="color:#a371f7;">12%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Architecture -->
+<div style="margin-top:16px;padding:14px;background:rgba(248,81,73,0.1);border:1px solid #f85149;border-radius:8px;">
+  <h4 style="color:#f85149;margin:0 0 8px;">🔔 알림 아키텍처</h4>
+  <div style="display:flex;gap:12px;font-size:12px;color:#c9d1d9;">
+    <div style="flex:1;">
+      <strong>준실시간 알림 (5분):</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>EventBridge → Lambda → Athena (최근 5분 쿼리)</li>
+        <li>임계치 초과 시 SNS → Slack/Email</li>
+        <li>CloudWatch 커스텀 메트릭으로도 발행</li>
+      </ul>
+    </div>
+    <div style="flex:1;">
+      <strong>Grafana 알림 (보조):</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>대시보드 패널 기반 알림 규칙</li>
+        <li>트렌드 기반 알림 (전일 대비 악화)</li>
+        <li>Slack/PagerDuty 통합</li>
+      </ul>
+    </div>
+    <div style="flex:1;">
+      <strong>파이프라인 헬스:</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>Firehose DeliveryToS3 메트릭 → CloudWatch</li>
+        <li>Lambda 에러율 → CloudWatch Alarm</li>
+        <li>이벤트 수신량 급감 탐지</li>
+      </ul>
+    </div>
+  </div>
+</div>

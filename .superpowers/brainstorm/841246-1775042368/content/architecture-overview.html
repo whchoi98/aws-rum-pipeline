@@ -1,0 +1,132 @@
+<h2>전체 아키텍처 Overview</h2>
+<p class="subtitle">Custom RUM Pipeline — 6개 레이어 구조</p>
+
+<div class="mockup">
+  <div class="mockup-header">Architecture Diagram — AWS Custom RUM Pipeline</div>
+  <div class="mockup-body" style="padding:24px;background:#0d1117;overflow-x:auto;">
+    <div style="display:flex;flex-direction:column;gap:20px;min-width:700px;">
+
+      <!-- Layer 1: SDK -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">① SDK Layer<br><span style="color:#58a6ff;">클라이언트</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#1a3a2a;border:1px solid #2ea043;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#2ea043;">Web SDK</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Performance API<br>Error Listener<br>Click/Navigation</div>
+          </div>
+          <div style="background:#1a3a2a;border:1px solid #2ea043;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#2ea043;">Mobile SDK</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Crash Reporter<br>Screen Tracking<br>Network Monitor</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div style="text-align:center;color:#484f58;font-size:20px;">▼ HTTPS (batched events, gzip)</div>
+
+      <!-- Layer 2: Ingestion -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">② Ingestion<br><span style="color:#d29922;">수집</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a2a1a;border:1px solid #d29922;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#d29922;">API Gateway (HTTP API)</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">인증 / Rate Limit / CORS</div>
+          </div>
+          <div style="background:#2a2a1a;border:1px solid #d29922;border-radius:8px;padding:12px 16px;flex:0.6;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#d29922;">Lambda (Validator)</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">스키마 검증<br>배치 분할</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div style="text-align:center;color:#484f58;font-size:20px;">▼</div>
+
+      <!-- Layer 3: Stream -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">③ Stream<br><span style="color:#bc4c00;">스트림 처리</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a1a1a;border:1px solid #f85149;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#f85149;">Kinesis Data Streams</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">샤드 2~4개 (오토스케일링)<br>24시간 보관</div>
+          </div>
+          <div style="background:#2a1a1a;border:1px solid #bc4c00;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#bc4c00;">Lambda (Enricher)</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">GeoIP Lookup<br>UA Parsing<br>Session Stitching</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div style="text-align:center;color:#484f58;font-size:20px;">▼</div>
+
+      <!-- Layer 4: Storage -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">④ Storage<br><span style="color:#58a6ff;">저장</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#1a2a3a;border:1px solid #58a6ff;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#58a6ff;">S3 (Data Lake)</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Raw: 90일 (S3 Standard)<br>Aggregated: 1년 (S3 IA)<br>Archive: Glacier</div>
+          </div>
+          <div style="background:#1a2a3a;border:1px solid #58a6ff;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#58a6ff;">OpenSearch (기존 클러스터)</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Hot: 7일 (실시간 검색)<br>Warm: 90일 (분석용)<br>ISM 자동 관리</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div style="text-align:center;color:#484f58;font-size:20px;">▼</div>
+
+      <!-- Layer 5: Aggregation -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">⑤ Aggregation<br><span style="color:#a371f7;">집계</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a1a3a;border:1px solid #a371f7;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#a371f7;">EventBridge + Lambda</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">매시간: 성능 메트릭 롤업<br>매일: 사용자 행동 집계<br>매주: 트렌드 리포트</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div style="text-align:center;color:#484f58;font-size:20px;">▼</div>
+
+      <!-- Layer 6: Dashboard -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">⑥ Dashboard<br><span style="color:#f778ba;">시각화</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a1a2a;border:1px solid #f778ba;border-radius:8px;padding:12px 16px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#f778ba;">Grafana</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Core Web Vitals 대시보드<br>사용자 여정 분석<br>에러 모니터링<br>실시간 알림 (SNS/Slack)</div>
+          </div>
+          <div style="background:#2a1a2a;border:1px solid #f778ba;border-radius:8px;padding:12px 16px;flex:0.6;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#f778ba;">CloudWatch Alarms</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">에러율 임계치<br>성능 저하 감지</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;padding:16px;background:rgba(255,255,255,0.03);border-radius:8px;">
+  <h3>Phase 2 확장 (세션 리플레이)</h3>
+  <div style="display:flex;gap:10px;margin-top:8px;">
+    <div style="background:rgba(88,166,255,0.1);border:1px dashed #58a6ff;border-radius:8px;padding:12px;flex:1;text-align:center;">
+      <div style="font-size:12px;color:#58a6ff;">rrweb SDK 통합</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:4px;">DOM 변경 기록</div>
+    </div>
+    <div style="color:#484f58;display:flex;align-items:center;">→</div>
+    <div style="background:rgba(88,166,255,0.1);border:1px dashed #58a6ff;border-radius:8px;padding:12px;flex:1;text-align:center;">
+      <div style="font-size:12px;color:#58a6ff;">S3 저장</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:4px;">리플레이 데이터</div>
+    </div>
+    <div style="color:#484f58;display:flex;align-items:center;">→</div>
+    <div style="background:rgba(88,166,255,0.1);border:1px dashed #58a6ff;border-radius:8px;padding:12px;flex:1;text-align:center;">
+      <div style="font-size:12px;color:#58a6ff;">Replay Viewer</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:4px;">Grafana 패널 / 별도 UI</div>
+    </div>
+  </div>
+</div>

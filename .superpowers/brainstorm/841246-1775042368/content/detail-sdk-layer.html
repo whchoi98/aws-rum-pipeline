@@ -1,0 +1,163 @@
+<h2>상세 설계 ① — SDK Layer (클라이언트)</h2>
+<p class="subtitle">Web과 Mobile에서 이벤트를 수집하여 백엔드로 전송하는 경량 SDK</p>
+
+<!-- Web SDK -->
+<div class="section">
+  <h3>Web SDK</h3>
+  <div style="display:flex;gap:12px;">
+    <div style="flex:1;padding:16px;background:rgba(46,160,67,0.1);border:1px solid #2ea043;border-radius:8px;">
+      <h4 style="color:#2ea043;margin:0 0 10px;">수집 이벤트</h4>
+      <table style="width:100%;font-size:12px;color:#c9d1d9;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">Performance</td>
+          <td>LCP, FID/INP, CLS, TTFB, FCP</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">Navigation</td>
+          <td>페이지뷰, SPA 라우트 변경, 히스토리 변경</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">User Action</td>
+          <td>클릭, 스크롤 깊이, 폼 인터랙션</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">Error</td>
+          <td>JS 에러, 미처리 프로미스, 콘솔 에러</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;font-weight:600;">Resource</td>
+          <td>XHR/Fetch 요청, 응답 시간, 상태 코드</td>
+        </tr>
+      </table>
+    </div>
+    <div style="flex:1;padding:16px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:8px;">
+      <h4 style="color:#58a6ff;margin:0 0 10px;">구현 전략</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <p style="margin:0 0 8px;"><strong>방식:</strong> 자체 경량 SDK (TypeScript)</p>
+        <p style="margin:0 0 8px;"><strong>크기 목표:</strong> gzip 후 &lt;10KB</p>
+        <p style="margin:0 0 8px;"><strong>핵심 API 활용:</strong></p>
+        <ul style="margin:0;padding-left:16px;">
+          <li><code>PerformanceObserver</code> — CWV 수집</li>
+          <li><code>window.onerror</code> / <code>onunhandledrejection</code></li>
+          <li><code>MutationObserver</code> — SPA 라우트 감지</li>
+          <li><code>navigator.sendBeacon</code> — 페이지 이탈 시 전송</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile SDK -->
+<div class="section" style="margin-top:16px;">
+  <h3>Mobile SDK</h3>
+  <div style="display:flex;gap:12px;">
+    <div style="flex:1;padding:16px;background:rgba(210,153,34,0.1);border:1px solid #d29922;border-radius:8px;">
+      <h4 style="color:#d29922;margin:0 0 10px;">수집 이벤트</h4>
+      <table style="width:100%;font-size:12px;color:#c9d1d9;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">Performance</td>
+          <td>앱 시작 시간, 화면 로딩, 프레임 드랍</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">Screen</td>
+          <td>화면 진입/이탈, 체류 시간</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">User Action</td>
+          <td>탭, 스와이프, 스크롤</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:6px 0;font-weight:600;">Crash</td>
+          <td>미처리 예외, ANR (Android), OOM</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;font-weight:600;">Network</td>
+          <td>API 호출, 응답 시간, 에러율</td>
+        </tr>
+      </table>
+    </div>
+    <div style="flex:1;padding:16px;background:rgba(88,166,255,0.1);border:1px solid #58a6ff;border-radius:8px;">
+      <h4 style="color:#58a6ff;margin:0 0 10px;">구현 전략</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <p style="margin:0 0 8px;"><strong>방식:</strong> 프레임워크별 SDK 래퍼</p>
+        <ul style="margin:0;padding-left:16px;">
+          <li><strong>React Native:</strong> JS 레이어 공유 + Native 모듈</li>
+          <li><strong>Flutter:</strong> Dart 플러그인 + MethodChannel</li>
+          <li><strong>Native:</strong> Swift/Kotlin 각각 구현</li>
+        </ul>
+        <p style="margin:8px 0;"><strong>핵심:</strong> Web SDK와 동일한 이벤트 스키마 공유</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Common: Event Schema & Transport -->
+<div class="section" style="margin-top:16px;">
+  <h3>공통: 이벤트 스키마 & 전송</h3>
+  <div style="display:flex;gap:12px;">
+    <div style="flex:1;padding:16px;background:rgba(163,113,247,0.1);border:1px solid #a371f7;border-radius:8px;">
+      <h4 style="color:#a371f7;margin:0 0 10px;">통합 이벤트 스키마</h4>
+      <pre style="font-size:11px;color:#c9d1d9;background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;margin:0;">{
+  "session_id": "uuid",
+  "user_id": "hashed_id | anonymous",
+  "device_id": "uuid",
+  "timestamp": 1712000000000,
+  "platform": "web | ios | android",
+  "app_version": "2.1.0",
+  "event_type": "performance | action | error | navigation | resource",
+  "event_name": "lcp | click | js_error | page_view | xhr",
+  "payload": { /* 이벤트별 데이터 */ },
+  "context": {
+    "url": "/products/123",
+    "screen_name": "ProductDetail",
+    "device": { "os": "iOS 17", "model": "iPhone 15", "browser": "Chrome 120" },
+    "geo": { /* 서버사이드에서 IP 기반 enrichment */ },
+    "connection": { "type": "4g", "rtt": 50 }
+  }
+}</pre>
+    </div>
+    <div style="flex:0.7;padding:16px;background:rgba(248,81,73,0.1);border:1px solid #f85149;border-radius:8px;">
+      <h4 style="color:#f85149;margin:0 0 10px;">전송 전략</h4>
+      <div style="font-size:12px;color:#c9d1d9;">
+        <p style="margin:0 0 10px;"><strong>배치 전송:</strong></p>
+        <ul style="margin:0 0 10px;padding-left:16px;">
+          <li>이벤트를 로컬 버퍼에 쌓음</li>
+          <li>30초 간격 또는 10개 누적 시 전송</li>
+          <li>gzip 압축 (70~80% 절감)</li>
+        </ul>
+        <p style="margin:0 0 10px;"><strong>안정성:</strong></p>
+        <ul style="margin:0;padding-left:16px;">
+          <li>오프라인 시 IndexedDB/SQLite 큐잉</li>
+          <li>재시도 (exponential backoff)</li>
+          <li>페이지 이탈: <code>sendBeacon</code></li>
+          <li>앱 백그라운드: flush on pause</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Privacy -->
+<div style="margin-top:16px;padding:12px 16px;background:rgba(210,153,34,0.1);border:1px solid #d29922;border-radius:8px;">
+  <h4 style="color:#d29922;margin:0 0 6px;">🔒 프라이버시 & 샘플링</h4>
+  <div style="display:flex;gap:16px;font-size:12px;color:#c9d1d9;">
+    <div style="flex:1;">
+      <strong>PII 보호:</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>이메일/전화번호 자동 마스킹</li>
+        <li>입력 필드 값 수집 안 함</li>
+        <li>user_id는 해시 처리</li>
+        <li>IP 주소 저장 안 함 (GeoIP 후 폐기)</li>
+      </ul>
+    </div>
+    <div style="flex:1;">
+      <strong>샘플링:</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        <li>기본 100% (중규모에서 감당 가능)</li>
+        <li>트래픽 증가 시 세션 기반 샘플링</li>
+        <li>에러 이벤트는 항상 100% 수집</li>
+        <li>서버사이드 config로 원격 제어</li>
+      </ul>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,140 @@
+<h2>수정 아키텍처 — OpenSearch 제외, S3 + Athena 중심</h2>
+<p class="subtitle">상시 클러스터 없이, 쿼리할 때만 비용 발생하는 서버리스 분석 파이프라인</p>
+
+<div class="mockup">
+  <div class="mockup-header">Revised Architecture — Serverless RUM Pipeline (No OpenSearch)</div>
+  <div class="mockup-body" style="padding:24px;background:#0d1117;overflow-x:auto;">
+    <div style="display:flex;flex-direction:column;gap:18px;min-width:700px;">
+
+      <!-- Layer 1: SDK -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">① SDK<br><span style="color:#2ea043;">클라이언트</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#1a3a2a;border:1px solid #2ea043;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#2ea043;">Web SDK</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">CWV, Error, Click, Nav</div>
+          </div>
+          <div style="background:#1a3a2a;border:1px solid #2ea043;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#2ea043;">Mobile SDK</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Crash, Screen, Network</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#484f58;font-size:18px;">▼ HTTPS (batched, gzip)</div>
+
+      <!-- Layer 2: Ingestion -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">② Ingestion<br><span style="color:#d29922;">수집</span></div>
+        <div style="background:#2a2a1a;border:1px solid #d29922;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+          <div style="font-size:13px;font-weight:600;color:#d29922;">API Gateway (HTTP API)</div>
+          <div style="font-size:11px;color:#8b949e;margin-top:4px;">API Key 인증 / Rate Limit / CORS</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#484f58;font-size:18px;">▼</div>
+
+      <!-- Layer 3: Stream + Transform -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">③ Stream<br><span style="color:#f85149;">처리</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a1a1a;border:1px solid #f85149;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#f85149;">Kinesis Data Firehose</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">자동 배치 + S3 전송<br>Parquet 변환 내장</div>
+          </div>
+          <div style="background:#2a1a1a;border:1px solid #bc4c00;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#bc4c00;">Lambda (Transform)</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">GeoIP / UA Parse<br>Session Stitch<br>→ Parquet 변환</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#484f58;font-size:18px;">▼</div>
+
+      <!-- Layer 4: Storage (S3 only) -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">④ Storage<br><span style="color:#58a6ff;">저장</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#1a2a3a;border:1px solid #58a6ff;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#58a6ff;">S3 Data Lake</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">
+              <strong>Parquet 포맷</strong> (Athena 비용 최적화)<br>
+              파티셔닝: year/month/day/hour/platform
+            </div>
+          </div>
+          <div style="background:#1a2a3a;border:1px solid #58a6ff;border-radius:8px;padding:10px 14px;flex:0.7;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#58a6ff;">S3 Lifecycle</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">Raw: 90일 Standard<br>Agg: 1년 IA<br>Archive: Glacier</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#484f58;font-size:18px;">▼</div>
+
+      <!-- Layer 5: Query -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">⑤ Query<br><span style="color:#a371f7;">분석</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a1a3a;border:1px solid #a371f7;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#a371f7;">Athena</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">서버리스 SQL 쿼리<br>스캔 데이터당 $5/TB<br>Parquet + 파티션 = 비용 최소화</div>
+          </div>
+          <div style="background:#2a1a3a;border:1px solid #a371f7;border-radius:8px;padding:10px 14px;flex:0.7;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#a371f7;">Glue Catalog</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">테이블 스키마 관리<br>파티션 자동 감지</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#484f58;font-size:18px;">▼</div>
+
+      <!-- Layer 6: Dashboard + Alert -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:120px;font-size:11px;color:#8b949e;text-align:right;flex-shrink:0;">⑥ Dashboard<br><span style="color:#f778ba;">시각화/알림</span></div>
+        <div style="display:flex;gap:10px;flex:1;">
+          <div style="background:#2a1a2a;border:1px solid #f778ba;border-radius:8px;padding:10px 14px;flex:1;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#f778ba;">Grafana + Athena Plugin</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">CWV 대시보드 / 에러 현황<br>사용자 여정 분석<br>실시간 알림 → SNS / Slack</div>
+          </div>
+          <div style="background:#2a1a2a;border:1px solid #f778ba;border-radius:8px;padding:10px 14px;flex:0.5;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#f778ba;">CloudWatch</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:4px;">파이프라인<br>헬스 모니터링</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cost comparison -->
+<div style="margin-top:20px;display:flex;gap:12px;">
+  <div style="flex:1;padding:16px;background:rgba(46,160,67,0.1);border:1px solid #2ea043;border-radius:8px;">
+    <h3 style="color:#2ea043;margin:0 0 8px;">💰 수정 아키텍처 비용 (DAU 5만)</h3>
+    <table style="width:100%;font-size:12px;color:#c9d1d9;">
+      <tr><td>API Gateway</td><td style="text-align:right;">~$15/월</td></tr>
+      <tr><td>Kinesis Firehose</td><td style="text-align:right;">~$30/월</td></tr>
+      <tr><td>Lambda (Transform)</td><td style="text-align:right;">~$20/월</td></tr>
+      <tr><td>S3 Storage</td><td style="text-align:right;">~$25/월</td></tr>
+      <tr><td>Athena Queries</td><td style="text-align:right;">~$30/월</td></tr>
+      <tr><td>Glue Catalog</td><td style="text-align:right;">~$1/월</td></tr>
+      <tr><td>Grafana (OSS on EC2/ECS)</td><td style="text-align:right;">~$30/월</td></tr>
+      <tr style="font-weight:bold;border-top:1px solid #30363d;"><td>합계</td><td style="text-align:right;color:#2ea043;">~$150/월</td></tr>
+    </table>
+  </div>
+  <div style="flex:0.6;padding:16px;background:rgba(248,81,73,0.1);border:1px solid #f85149;border-radius:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+    <div style="font-size:11px;color:#8b949e;">Datadog RUM 대비</div>
+    <div style="font-size:36px;font-weight:bold;color:#2ea043;margin:8px 0;">~90%</div>
+    <div style="font-size:11px;color:#8b949e;">비용 절감</div>
+    <div style="font-size:12px;color:#f85149;margin-top:8px;">$1,500~3,000 → ~$150/월</div>
+  </div>
+</div>
+
+<div style="margin-top:16px;padding:12px 16px;background:rgba(163,113,247,0.1);border:1px solid #a371f7;border-radius:8px;">
+  <h4 style="color:#a371f7;margin:0 0 6px;">핵심 변경점 (vs 이전 안)</h4>
+  <ul style="font-size:12px;color:#c9d1d9;margin:0;padding-left:20px;">
+    <li><strong>OpenSearch → S3 + Athena:</strong> 상시 클러스터 비용 제거, 쿼리 시에만 과금</li>
+    <li><strong>Kinesis Streams → Firehose:</strong> S3 직접 전송 + Parquet 변환 내장으로 구조 단순화</li>
+    <li><strong>Parquet 포맷:</strong> 컬럼형 압축으로 Athena 스캔 비용 80~90% 절감</li>
+    <li><strong>파티셔닝:</strong> year/month/day/hour/platform 으로 쿼리 범위 최소화</li>
+  </ul>
+</div>
