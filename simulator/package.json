@@ -1,0 +1,17 @@
+{
+  "name": "rum-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "tsx": "^4.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "@types/node": "^20.0.0"
+  }
+}
