@@ -13,7 +13,7 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: simulator
-            image: ${ECR_REPO}/rum-simulator:latest
+            image: 061525506239.dkr.ecr.ap-northeast-2.amazonaws.com/rum-simulator:latest
             env:
             - name: RUM_API_ENDPOINT
               value: "https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com"
