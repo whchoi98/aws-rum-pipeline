@@ -75,3 +75,23 @@ class TestIngestHandler:
 
         assert result["statusCode"] == 200
         assert mock_firehose.put_record_batch.call_count == 2
+
+    def test_empty_list_returns_400(self):
+        from handler import handler
+
+        api_event = {"body": json.dumps([]), "isBase64Encoded": False}
+        result = handler(api_event, None)
+        assert result["statusCode"] == 400
+
+    @patch("handler.firehose")
+    def test_partial_failure_returns_207(self, mock_firehose):
+        from handler import handler
+
+        mock_firehose.put_record_batch.return_value = {"FailedPutCount": 1}
+        events = [{"session_id": "s1", "event_type": "action", "event_name": "click"}]
+        api_event = {"body": json.dumps(events), "isBase64Encoded": False}
+        result = handler(api_event, None)
+
+        assert result["statusCode"] == 207
+        body = json.loads(result["body"])
+        assert body["failed"] == 1

@@ -103,7 +103,8 @@ class TestPiiStripping:
         event = {"records": [_make_record(event_with_ip)]}
         result = handler(event, None)
         data = _decode_record(result["records"][0])
-        assert "ip" not in data.get("context", {})
+        ctx = json.loads(data["context"]) if isinstance(data.get("context"), str) else data.get("context", {})
+        assert "ip" not in ctx
 
 
 class TestBatchProcessing:

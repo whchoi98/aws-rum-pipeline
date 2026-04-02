@@ -106,7 +106,7 @@ resource "aws_iam_role_policy" "firehose" {
         Sid      = "CloudWatchLogs"
         Effect   = "Allow"
         Action   = ["logs:PutLogEvents", "logs:CreateLogStream"]
-        Resource = "*"
+        Resource = "${aws_cloudwatch_log_group.firehose.arn}:*"
       }
     ]
   })

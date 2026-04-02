@@ -24,12 +24,33 @@ def handler(event, context):
             "body": json.dumps({"error": "Invalid JSON"}),
         }
 
+    if not events:
+        return {
+            "statusCode": 400,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"error": "Empty event list"}),
+        }
+
     records = [{"Data": (json.dumps(e) + "\n").encode("utf-8")} for e in events]
 
     # PutRecordBatch limit: 500 records per call
+    failed_count = 0
     for i in range(0, len(records), 500):
         batch = records[i : i + 500]
-        firehose.put_record_batch(DeliveryStreamName=STREAM_NAME, Records=batch)
+        resp = firehose.put_record_batch(DeliveryStreamName=STREAM_NAME, Records=batch)
+        failed_count += resp.get("FailedPutCount", 0)
+
+    if failed_count > 0:
+        return {
+            "statusCode": 207,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            },
+            "body": json.dumps(
+                {"status": "partial", "count": len(records), "failed": failed_count}
+            ),
+        }
 
     return {
         "statusCode": 200,
