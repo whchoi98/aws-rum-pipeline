@@ -30,3 +30,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "authorizer_invoke_arn" {
+  description = "Lambda Authorizer invoke ARN"
+  type        = string
+  default     = null
+}
+
+variable "waf_acl_arn" {
+  description = "WAF WebACL ARN to associate with API stage"
+  type        = string
+  default     = null
+}
+
+variable "authorizer_function_name" {
+  description = "Lambda Authorizer function name (for invoke permission)"
+  type        = string
+  default     = null
+}

@@ -13,3 +13,8 @@ output "ingest_lambda_arn" {
   description = "Ingest Lambda function ARN"
   value       = aws_lambda_function.ingest.arn
 }
+
+output "api_execution_arn" {
+  description = "HTTP API execution ARN (for Lambda permissions)"
+  value       = aws_apigatewayv2_api.rum.execution_arn
+}

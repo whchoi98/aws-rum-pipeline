@@ -98,6 +98,47 @@ resource "aws_apigatewayv2_stage" "default" {
   tags = var.tags
 }
 
+# -----------------------------------------------------------------------------
+# Lambda Authorizer (conditional)
+# -----------------------------------------------------------------------------
+
+resource "aws_apigatewayv2_authorizer" "api_key" {
+  count = var.authorizer_invoke_arn != null ? 1 : 0
+
+  api_id                            = aws_apigatewayv2_api.rum.id
+  authorizer_type                   = "REQUEST"
+  authorizer_uri                    = var.authorizer_invoke_arn
+  authorizer_payload_format_version = "2.0"
+  authorizer_result_ttl_in_seconds  = 300
+  identity_sources                  = ["$request.header.x-api-key"]
+  name                              = "${var.project_name}-api-key-authorizer"
+}
+
+# -----------------------------------------------------------------------------
+# WAF Association (conditional)
+# -----------------------------------------------------------------------------
+
+resource "aws_wafv2_web_acl_association" "api" {
+  count = var.waf_acl_arn != null ? 1 : 0
+
+  resource_arn = aws_apigatewayv2_stage.default.arn
+  web_acl_arn  = var.waf_acl_arn
+}
+
+# -----------------------------------------------------------------------------
+# Authorizer Lambda Permission (conditional)
+# -----------------------------------------------------------------------------
+
+resource "aws_lambda_permission" "authorizer_apigw" {
+  count = var.authorizer_function_name != null ? 1 : 0
+
+  statement_id  = "AllowAPIGatewayInvokeAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = var.authorizer_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.rum.execution_arn}/*/*"
+}
+
 resource "aws_apigatewayv2_integration" "ingest_lambda" {
   api_id                 = aws_apigatewayv2_api.rum.id
   integration_type       = "AWS_PROXY"
@@ -109,12 +150,18 @@ resource "aws_apigatewayv2_route" "post_events" {
   api_id    = aws_apigatewayv2_api.rum.id
   route_key = "POST /v1/events"
   target    = "integrations/${aws_apigatewayv2_integration.ingest_lambda.id}"
+
+  authorization_type = var.authorizer_invoke_arn != null ? "CUSTOM" : "NONE"
+  authorizer_id      = var.authorizer_invoke_arn != null ? aws_apigatewayv2_authorizer.api_key[0].id : null
 }
 
 resource "aws_apigatewayv2_route" "post_beacon" {
   api_id    = aws_apigatewayv2_api.rum.id
   route_key = "POST /v1/events/beacon"
   target    = "integrations/${aws_apigatewayv2_integration.ingest_lambda.id}"
+
+  authorization_type = var.authorizer_invoke_arn != null ? "CUSTOM" : "NONE"
+  authorizer_id      = var.authorizer_invoke_arn != null ? aws_apigatewayv2_authorizer.api_key[0].id : null
 }
 
 resource "aws_lambda_permission" "apigw" {
