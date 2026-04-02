@@ -28,3 +28,18 @@ output "api_key_ssm_name" {
   description = "SSM parameter name for API keys"
   value       = module.security.api_key_ssm_name
 }
+
+output "grafana_workspace_endpoint" {
+  description = "Amazon Managed Grafana workspace URL"
+  value       = module.grafana.workspace_endpoint
+}
+
+output "grafana_workspace_id" {
+  description = "Amazon Managed Grafana workspace ID"
+  value       = module.grafana.workspace_id
+}
+
+output "athena_workgroup" {
+  description = "Athena workgroup name for RUM queries"
+  value       = module.grafana.athena_workgroup
+}
