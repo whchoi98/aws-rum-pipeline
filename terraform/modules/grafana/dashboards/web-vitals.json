@@ -1,0 +1,186 @@
+{
+  "title": "RUM — Core Web Vitals",
+  "uid": "rum-core-web-vitals",
+  "description": "LCP, CLS, and INP p75 metrics from the RUM pipeline",
+  "tags": ["rum", "web-vitals"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "5m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "LCP p75 (ms)",
+      "type": "gauge",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 6 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT approx_percentile(CAST(json_extract_scalar(payload, '$.value') AS DOUBLE), 0.75) AS lcp_p75 FROM rum_pipeline_db.rum_events WHERE event_name = 'lcp' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "CLS p75",
+      "type": "gauge",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 6 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.25 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT approx_percentile(CAST(json_extract_scalar(payload, '$.value') AS DOUBLE), 0.75) AS cls_p75 FROM rum_pipeline_db.rum_events WHERE event_name = 'cls' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "INP p75 (ms)",
+      "type": "gauge",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 6 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT approx_percentile(CAST(json_extract_scalar(payload, '$.value') AS DOUBLE), 0.75) AS inp_p75 FROM rum_pipeline_db.rum_events WHERE event_name = 'inp' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "LCP Trend (24h) — p75 per hour",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT date_trunc('hour', from_unixtime(timestamp / 1000)) AS time, approx_percentile(CAST(json_extract_scalar(payload, '$.value') AS DOUBLE), 0.75) AS lcp_p75 FROM rum_pipeline_db.rum_events WHERE event_name = 'lcp' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "timeColumns": ["time"],
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "LCP Rating Distribution",
+      "type": "piechart",
+      "gridPos": { "x": 12, "y": 6, "w": 6, "h": 8 },
+      "options": {
+        "pieType": "pie",
+        "displayLabels": ["name", "percent"]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT json_extract_scalar(payload, '$.rating') AS rating, COUNT(*) AS count FROM rum_pipeline_db.rum_events WHERE event_name = 'lcp' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Core Web Vitals by Page (p75)",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 8 },
+      "options": {
+        "sortBy": [{ "displayName": "LCP p75", "desc": true }]
+      },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "LCP p75" }, "properties": [{ "id": "unit", "value": "ms" }] },
+          { "matcher": { "id": "byName", "options": "INP p75" }, "properties": [{ "id": "unit", "value": "ms" }] }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT json_extract_scalar(context, '$.url') AS page, approx_percentile(CASE WHEN event_name = 'lcp' THEN CAST(json_extract_scalar(payload, '$.value') AS DOUBLE) END, 0.75) AS \"LCP p75\", approx_percentile(CASE WHEN event_name = 'cls' THEN CAST(json_extract_scalar(payload, '$.value') AS DOUBLE) END, 0.75) AS \"CLS p75\", approx_percentile(CASE WHEN event_name = 'inp' THEN CAST(json_extract_scalar(payload, '$.value') AS DOUBLE) END, 0.75) AS \"INP p75\", COUNT(*) AS samples FROM rum_pipeline_db.rum_events WHERE event_name IN ('lcp', 'cls', 'inp') AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "pluginId": "grafana-athena-datasource",
+        "label": "Athena Data Source",
+        "hide": 0
+      }
+    ]
+  }
+}
