@@ -69,3 +69,15 @@ module "api_gateway" {
   waf_acl_arn              = module.security.waf_acl_arn
   tags                     = { Component = "ingestion" }
 }
+
+# -----------------------------------------------------------------------------
+# Monitoring — CloudWatch Dashboard
+# -----------------------------------------------------------------------------
+
+module "monitoring" {
+  source       = "./modules/monitoring"
+  project_name = var.project_name
+  region       = var.aws_region
+  api_id       = module.api_gateway.api_id
+  tags         = { Component = "monitoring" }
+}
