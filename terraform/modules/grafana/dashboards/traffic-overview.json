@@ -1,0 +1,174 @@
+{
+  "title": "RUM — Traffic Overview",
+  "uid": "rum-traffic-overview",
+  "description": "Event volume, page traffic, platform and browser distribution",
+  "tags": ["rum", "traffic"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "5m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Events Today",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT COUNT(*) AS total_events FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Unique Sessions Today",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT COUNT(DISTINCT session_id) AS unique_sessions FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Events by Type",
+      "type": "piechart",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 8 },
+      "options": {
+        "pieType": "pie",
+        "displayLabels": ["name", "percent"]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT event_type, COUNT(*) AS count FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Platform Distribution",
+      "type": "piechart",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 8 },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": ["name", "percent"]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT platform, COUNT(*) AS count FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Events Trend (24h) — events per hour",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 16, "h": 8 },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT date_trunc('hour', from_unixtime(timestamp / 1000)) AS time, event_type, COUNT(*) AS events FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series",
+          "timeColumns": ["time"],
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Browser Distribution",
+      "type": "barchart",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelMaxLength": 20
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT json_extract_scalar(context, '$.device.browser') AS browser, COUNT(*) AS count FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' AND json_extract_scalar(context, '$.device.browser') IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Top Pages by Traffic",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 },
+      "options": {
+        "sortBy": [{ "displayName": "Events", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT json_extract_scalar(context, '$.url') AS page, COUNT(*) AS events, COUNT(DISTINCT session_id) AS sessions, CAST(SUM(CASE WHEN event_type = 'error' THEN 1 ELSE 0 END) AS DOUBLE) * 100.0 / NULLIF(COUNT(*), 0) AS error_pct FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' AND json_extract_scalar(context, '$.url') IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "error_pct" }, "properties": [{ "id": "unit", "value": "percent" }, { "id": "decimals", "value": 2 }] }
+        ]
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "pluginId": "grafana-athena-datasource",
+        "label": "Athena Data Source",
+        "hide": 0
+      }
+    ]
+  }
+}
