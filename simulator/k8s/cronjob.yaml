@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rum-simulator
+  namespace: rum
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: simulator
+            image: ${ECR_REPO}/rum-simulator:latest
+            env:
+            - name: RUM_API_ENDPOINT
+              value: "https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com"
+            - name: EVENTS_PER_BATCH
+              value: "100"
+            - name: CONCURRENT_SESSIONS
+              value: "10"
+            - name: RUM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rum-api-key
+                  key: api-key
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "200m"
+                memory: "256Mi"
