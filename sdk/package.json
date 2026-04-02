@@ -1,0 +1,22 @@
+{
+  "name": "@myorg/rum-sdk",
+  "version": "0.1.0",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "browser": "dist/rum-sdk.min.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "web-vitals": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "esbuild": "^0.21.0",
+    "vitest": "^1.6.0",
+    "jsdom": "^24.0.0"
+  }
+}
