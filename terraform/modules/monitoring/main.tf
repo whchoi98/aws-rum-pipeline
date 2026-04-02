@@ -157,6 +157,4 @@ resource "aws_cloudwatch_dashboard" "rum" {
       }
     ]
   })
-
-  tags = var.tags
 }
