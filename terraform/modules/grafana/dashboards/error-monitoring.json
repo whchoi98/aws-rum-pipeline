@@ -1,0 +1,163 @@
+{
+  "title": "RUM — Error Monitoring",
+  "uid": "rum-error-monitoring",
+  "description": "JavaScript errors, unhandled rejections, and error rate trends",
+  "tags": ["rum", "errors"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "5m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Error Rate (%)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT CAST(SUM(CASE WHEN event_type = 'error' THEN 1 ELSE 0 END) AS DOUBLE) * 100.0 / NULLIF(COUNT(*), 0) AS error_rate FROM rum_pipeline_db.rum_events WHERE year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Total Errors Today",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT COUNT(*) AS error_count FROM rum_pipeline_db.rum_events WHERE event_type = 'error' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}'",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Error Trend (24h) — errors per hour",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 16, "h": 8 },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 40 } }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT date_trunc('hour', from_unixtime(timestamp / 1000)) AS time, COUNT(*) AS errors FROM rum_pipeline_db.rum_events WHERE event_type = 'error' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "timeColumns": ["time"],
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Error by Type",
+      "type": "piechart",
+      "gridPos": { "x": 16, "y": 4, "w": 8, "h": 8 },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": ["name", "percent"]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT event_name AS error_type, COUNT(*) AS count FROM rum_pipeline_db.rum_events WHERE event_type = 'error' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Top 10 Error Messages",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 12, "w": 14, "h": 8 },
+      "options": {
+        "sortBy": [{ "displayName": "Count", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT json_extract_scalar(payload, '$.message') AS error_message, event_name AS error_type, COUNT(*) AS count FROM rum_pipeline_db.rum_events WHERE event_type = 'error' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 10",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Recent Errors (last 20)",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
+      "options": {
+        "sortBy": [{ "displayName": "time", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-athena-datasource", "uid": "${datasource}" },
+          "rawSQL": "SELECT from_unixtime(timestamp / 1000) AS time, event_name AS error_type, json_extract_scalar(payload, '$.message') AS message, json_extract_scalar(context, '$.url') AS url, platform FROM rum_pipeline_db.rum_events WHERE event_type = 'error' AND year = '${__from:date:YYYY}' AND month = '${__from:date:MM}' AND day = '${__from:date:DD}' ORDER BY timestamp DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "pluginId": "grafana-athena-datasource",
+        "label": "Athena Data Source",
+        "hide": 0
+      }
+    ]
+  }
+}
