@@ -18,3 +18,13 @@ output "glue_database_name" {
   description = "Glue catalog database name"
   value       = module.glue_catalog.database_name
 }
+
+output "waf_acl_arn" {
+  description = "WAF WebACL ARN"
+  value       = module.security.waf_acl_arn
+}
+
+output "api_key_ssm_name" {
+  description = "SSM parameter name for API keys"
+  value       = module.security.api_key_ssm_name
+}
