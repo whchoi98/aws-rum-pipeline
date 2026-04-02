@@ -63,6 +63,7 @@ module "api_gateway" {
   firehose_stream_arn      = module.firehose.delivery_stream_arn
   lambda_source_dir        = "${path.module}/../lambda/ingest"
   allowed_origins          = var.allowed_origins
+  enable_auth              = true
   authorizer_invoke_arn    = module.security.authorizer_invoke_arn
   authorizer_function_name = module.security.authorizer_function_name
   waf_acl_arn              = module.security.waf_acl_arn

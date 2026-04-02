@@ -31,6 +31,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "enable_auth" {
+  description = "Enable Lambda Authorizer and WAF (must be plan-time known)"
+  type        = bool
+  default     = false
+}
+
 variable "authorizer_invoke_arn" {
   description = "Lambda Authorizer invoke ARN"
   type        = string

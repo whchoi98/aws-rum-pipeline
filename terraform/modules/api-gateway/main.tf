@@ -103,7 +103,7 @@ resource "aws_apigatewayv2_stage" "default" {
 # -----------------------------------------------------------------------------
 
 resource "aws_apigatewayv2_authorizer" "api_key" {
-  count = var.authorizer_invoke_arn != null ? 1 : 0
+  count = var.enable_auth ? 1 : 0
 
   api_id                            = aws_apigatewayv2_api.rum.id
   authorizer_type                   = "REQUEST"
@@ -119,7 +119,7 @@ resource "aws_apigatewayv2_authorizer" "api_key" {
 # -----------------------------------------------------------------------------
 
 resource "aws_wafv2_web_acl_association" "api" {
-  count = var.waf_acl_arn != null ? 1 : 0
+  count = var.enable_auth ? 1 : 0
 
   resource_arn = aws_apigatewayv2_stage.default.arn
   web_acl_arn  = var.waf_acl_arn
@@ -130,7 +130,7 @@ resource "aws_wafv2_web_acl_association" "api" {
 # -----------------------------------------------------------------------------
 
 resource "aws_lambda_permission" "authorizer_apigw" {
-  count = var.authorizer_function_name != null ? 1 : 0
+  count = var.enable_auth ? 1 : 0
 
   statement_id  = "AllowAPIGatewayInvokeAuthorizer"
   action        = "lambda:InvokeFunction"
@@ -151,8 +151,8 @@ resource "aws_apigatewayv2_route" "post_events" {
   route_key = "POST /v1/events"
   target    = "integrations/${aws_apigatewayv2_integration.ingest_lambda.id}"
 
-  authorization_type = var.authorizer_invoke_arn != null ? "CUSTOM" : "NONE"
-  authorizer_id      = var.authorizer_invoke_arn != null ? aws_apigatewayv2_authorizer.api_key[0].id : null
+  authorization_type = var.enable_auth ? "CUSTOM" : "NONE"
+  authorizer_id      = var.enable_auth ? aws_apigatewayv2_authorizer.api_key[0].id : null
 }
 
 resource "aws_apigatewayv2_route" "post_beacon" {
@@ -160,8 +160,8 @@ resource "aws_apigatewayv2_route" "post_beacon" {
   route_key = "POST /v1/events/beacon"
   target    = "integrations/${aws_apigatewayv2_integration.ingest_lambda.id}"
 
-  authorization_type = var.authorizer_invoke_arn != null ? "CUSTOM" : "NONE"
-  authorizer_id      = var.authorizer_invoke_arn != null ? aws_apigatewayv2_authorizer.api_key[0].id : null
+  authorization_type = var.enable_auth ? "CUSTOM" : "NONE"
+  authorizer_id      = var.enable_auth ? aws_apigatewayv2_authorizer.api_key[0].id : null
 }
 
 resource "aws_lambda_permission" "apigw" {
