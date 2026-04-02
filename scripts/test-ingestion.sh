@@ -15,14 +15,14 @@ echo "Endpoint: ${EVENTS_URL}"
 echo ""
 
 # Test 1: Reject request without API key
-echo "--- Test 1: No API key (expect 403) ---"
+echo "--- Test 1: No API key (expect 401) ---"
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${EVENTS_URL}" \
   -H "Content-Type: application/json" \
   -d '[{"session_id":"test","timestamp":0,"platform":"web","event_type":"test","event_name":"test","payload":{}}]')
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 echo "Status: ${HTTP_CODE}"
-if [ "$HTTP_CODE" = "403" ]; then echo "PASS"; else echo "FAIL (expected 403, got ${HTTP_CODE})"; exit 1; fi
+if [ "$HTTP_CODE" = "401" ]; then echo "PASS"; else echo "FAIL (expected 401, got ${HTTP_CODE})"; exit 1; fi
 echo ""
 
 # Test 2: Reject request with invalid API key

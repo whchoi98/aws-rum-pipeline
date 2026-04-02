@@ -109,21 +109,14 @@ resource "aws_apigatewayv2_authorizer" "api_key" {
   authorizer_type                   = "REQUEST"
   authorizer_uri                    = var.authorizer_invoke_arn
   authorizer_payload_format_version = "2.0"
+  enable_simple_responses           = true
   authorizer_result_ttl_in_seconds  = 300
   identity_sources                  = ["$request.header.x-api-key"]
   name                              = "${var.project_name}-api-key-authorizer"
 }
 
-# -----------------------------------------------------------------------------
-# WAF Association (conditional)
-# -----------------------------------------------------------------------------
-
-resource "aws_wafv2_web_acl_association" "api" {
-  count = var.enable_auth ? 1 : 0
-
-  resource_arn = aws_apigatewayv2_stage.default.arn
-  web_acl_arn  = var.waf_acl_arn
-}
+# NOTE: WAF WebACL cannot be associated directly with HTTP APIs (only REST APIs,
+# ALB, CloudFront). WAF association will be added when CloudFront is introduced.
 
 # -----------------------------------------------------------------------------
 # Authorizer Lambda Permission (conditional)
