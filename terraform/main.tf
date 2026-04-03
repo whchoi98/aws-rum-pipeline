@@ -111,3 +111,17 @@ module "partition_repair" {
   lambda_source_dir  = "${path.module}/../lambda/partition-repair"
   tags               = { Component = "partition-repair" }
 }
+
+# -----------------------------------------------------------------------------
+# Athena Query Lambda — AgentCore RUM 분석 에이전트용
+# -----------------------------------------------------------------------------
+
+module "athena_query" {
+  source             = "./modules/athena-query"
+  project_name       = var.project_name
+  glue_database_name = module.glue_catalog.database_name
+  athena_workgroup   = module.grafana.athena_workgroup
+  s3_bucket_arn      = module.s3_data_lake.bucket_arn
+  lambda_source_dir  = "${path.module}/../lambda/athena-query"
+  tags               = { Component = "agentcore" }
+}

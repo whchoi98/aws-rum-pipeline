@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUM 분석 에이전트</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column;
+        }
+        header {
+            background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px;
+            display: flex; align-items: center; gap: 12px;
+        }
+        header h1 { font-size: 18px; font-weight: 600; color: #f0f6fc; }
+        header .badge {
+            background: #238636; color: #fff; font-size: 11px; padding: 2px 8px;
+            border-radius: 12px; font-weight: 500;
+        }
+        .container { flex: 1; display: flex; flex-direction: column; max-width: 900px; width: 100%; margin: 0 auto; padding: 16px; overflow: hidden; }
+        .chat-area {
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+            padding: 16px 0; scrollbar-width: thin; scrollbar-color: #30363d #0d1117;
+        }
+        .message { display: flex; gap: 12px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { flex-direction: row-reverse; }
+        .avatar {
+            width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 16px; flex-shrink: 0;
+        }
+        .avatar.bot { background: #1f6feb; }
+        .avatar.user { background: #238636; }
+        .bubble {
+            max-width: 75%; padding: 12px 16px; border-radius: 12px; line-height: 1.6;
+            font-size: 14px; white-space: pre-wrap;
+        }
+        .message.bot .bubble { background: #161b22; border: 1px solid #30363d; }
+        .message.user .bubble { background: #1f6feb; color: #fff; }
+        .input-area { padding: 16px 0; border-top: 1px solid #30363d; }
+        .input-wrapper {
+            display: flex; gap: 8px; background: #161b22; border: 1px solid #30363d;
+            border-radius: 12px; padding: 8px 12px; transition: border-color 0.2s;
+        }
+        .input-wrapper:focus-within { border-color: #1f6feb; }
+        .input-wrapper textarea {
+            flex: 1; background: none; border: none; color: #c9d1d9; font-size: 14px;
+            font-family: inherit; resize: none; outline: none; line-height: 1.5; max-height: 120px;
+        }
+        .input-wrapper button {
+            background: #1f6feb; color: #fff; border: none; border-radius: 8px;
+            padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;
+            transition: background 0.2s; align-self: flex-end;
+        }
+        .input-wrapper button:hover { background: #388bfd; }
+        .input-wrapper button:disabled { background: #30363d; cursor: not-allowed; }
+        .quick-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .quick-btn {
+            background: #21262d; border: 1px solid #30363d; color: #8b949e;
+            padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-btn:hover { border-color: #1f6feb; color: #c9d1d9; }
+        .typing span {
+            display: inline-block; width: 8px; height: 8px; background: #8b949e;
+            border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; margin-right: 4px;
+        }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        .status-bar { display: flex; gap: 16px; font-size: 11px; color: #484f58; padding: 8px 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>RUM 분석 에이전트</h1>
+        <span class="badge">AgentCore</span>
+    </header>
+    <div class="container">
+        <div class="chat-area" id="chatArea"></div>
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea id="userInput" rows="1" placeholder="RUM 데이터에 대해 물어보세요..."></textarea>
+                <button id="sendBtn">전송</button>
+            </div>
+            <div class="quick-actions" id="quickActions"></div>
+            <div class="status-bar">
+                <span>모델: Claude Sonnet</span>
+                <span>DB: rum_pipeline_db</span>
+                <span>리전: ap-northeast-2</span>
+                <span id="sessionInfo">세션: -</span>
+            </div>
+        </div>
+    </div>
+    <script>
+        const AGENT_ENDPOINT = window.AGENT_ENDPOINT || '/api/invoke';
+        const sessionId = 'session-' + Date.now();
+        document.getElementById('sessionInfo').textContent = '\uC138\uC158: ' + sessionId.slice(-8);
+
+        const QUICK_QUESTIONS = [
+            { label: '\uD83D\uDCCA \uC624\uB298 \uD604\uD669', text: '\uC624\uB298 \uC804\uCCB4 \uD604\uD669\uC744 \uC54C\uB824\uC8FC\uC138\uC694' },
+            { label: '\uD83D\uDC22 \uB290\uB9B0 \uD398\uC774\uC9C0', text: 'LCP\uAC00 4\uCD08 \uB118\uB294 \uD398\uC774\uC9C0\uB97C \uCC3E\uC544\uC8FC\uC138\uC694' },
+            { label: '\uD83D\uDEA8 \uC5D0\uB7EC \uBD84\uC11D', text: '\uC5D0\uB7EC\uC728\uC774 \uB192\uC740 \uC6D0\uC778\uC744 \uBD84\uC11D\uD574\uC8FC\uC138\uC694' },
+            { label: '\uD83D\uDCF1 \uD50C\uB7AB\uD3FC \uBE44\uAD50', text: 'iOS vs Android \uC131\uB2A5 \uBE44\uAD50\uD574\uC8FC\uC138\uC694' },
+            { label: '\uD83D\uDCC8 \uC77C\uAC04 \uBE44\uAD50', text: '\uC5B4\uC81C \uB300\uBE44 \uC624\uB298 \uBCC0\uD654\uB97C \uBD84\uC11D\uD574\uC8FC\uC138\uC694' },
+            { label: '\uD83C\uDF10 \uBE0C\uB77C\uC6B0\uC800\uBCC4', text: '\uAC00\uC7A5 \uB9CE\uC740 \uC5D0\uB7EC\uAC00 \uBC1C\uC0DD\uD558\uB294 \uBE0C\uB77C\uC6B0\uC800\uB294?' },
+        ];
+
+        function createEl(tag, attrs, children) {
+            const el = document.createElement(tag);
+            if (attrs) Object.entries(attrs).forEach(([k, v]) => {
+                if (k === 'className') el.className = v;
+                else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+                else el.setAttribute(k, v);
+            });
+            if (typeof children === 'string') el.textContent = children;
+            else if (Array.isArray(children)) children.forEach(c => el.appendChild(c));
+            return el;
+        }
+
+        function addMessage(role, text) {
+            const chatArea = document.getElementById('chatArea');
+            const avatarText = role === 'bot' ? '\uD83E\uDD16' : '\uD83D\uDC64';
+            const msg = createEl('div', { className: 'message ' + role }, [
+                createEl('div', { className: 'avatar ' + (role === 'bot' ? 'bot' : 'user') }, avatarText),
+                createEl('div', { className: 'bubble' }, text),
+            ]);
+            chatArea.appendChild(msg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            return msg;
+        }
+
+        function addTypingIndicator() {
+            const chatArea = document.getElementById('chatArea');
+            const bubble = createEl('div', { className: 'bubble' }, [
+                createEl('div', { className: 'typing' }, [
+                    createEl('span'), createEl('span'), createEl('span'),
+                ]),
+            ]);
+            const typingNode = createEl('div', null, '\uBD84\uC11D \uC911...');
+            bubble.appendChild(typingNode);
+            const msg = createEl('div', { className: 'message bot', id: 'typingMsg' }, [
+                createEl('div', { className: 'avatar bot' }, '\uD83E\uDD16'),
+                bubble,
+            ]);
+            chatArea.appendChild(msg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const el = document.getElementById('typingMsg');
+            if (el) el.remove();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const btn = document.getElementById('sendBtn');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage('user', message);
+            input.value = '';
+            input.style.height = 'auto';
+            btn.disabled = true;
+            addTypingIndicator();
+
+            try {
+                const resp = await fetch(AGENT_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: message, session_id: sessionId }),
+                });
+                const data = await resp.json();
+                removeTypingIndicator();
+                addMessage('bot', data.result || data.error || '\uC751\uB2F5\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');
+            } catch (err) {
+                removeTypingIndicator();
+                addMessage('bot', '\u26A0\uFE0F \uC5F0\uACB0 \uC624\uB958: ' + err.message);
+            }
+            btn.disabled = false;
+            input.focus();
+        }
+
+        // Initialize
+        document.getElementById('sendBtn').addEventListener('click', sendMessage);
+        document.getElementById('userInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        document.getElementById('userInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Quick actions
+        const quickContainer = document.getElementById('quickActions');
+        QUICK_QUESTIONS.forEach(q => {
+            const btn = createEl('button', {
+                className: 'quick-btn',
+                onClick: function() {
+                    document.getElementById('userInput').value = q.text;
+                    sendMessage();
+                }
+            }, q.label);
+            quickContainer.appendChild(btn);
+        });
+
+        // Welcome message
+        addMessage('bot', '\uC548\uB155\uD558\uC138\uC694! RUM \uBD84\uC11D \uC5D0\uC774\uC804\uD2B8\uC785\uB2C8\uB2E4.\n\n\uC2E4\uC2DC\uAC04 \uC0AC\uC6A9\uC790 \uBAA8\uB2C8\uD130\uB9C1 \uB370\uC774\uD130\uB97C \uC790\uC5F0\uC5B4\uB85C \uBD84\uC11D\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\uC544\uB798 \uBE60\uB978 \uC9C8\uBB38\uC744 \uD074\uB9AD\uD558\uAC70\uB098 \uC9C1\uC811 \uC9C8\uBB38\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694.');
+    </script>
+</body>
+</html>
