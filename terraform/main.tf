@@ -125,3 +125,17 @@ module "athena_query" {
   lambda_source_dir  = "${path.module}/../lambda/athena-query"
   tags               = { Component = "agentcore" }
 }
+
+# -----------------------------------------------------------------------------
+# Agent UI — CloudFront + ALB + EC2 (Next.js)
+# -----------------------------------------------------------------------------
+
+module "agent_ui" {
+  source                 = "./modules/agent-ui"
+  project_name           = var.project_name
+  vpc_id                 = "vpc-04a740903971ad736"
+  public_subnet_ids      = ["subnet-065fef949a11a8d7b", "subnet-04246258dd0aa2b66"]
+  instance_type          = "t4g.large"
+  agentcore_endpoint_arn = "arn:aws:bedrock-agentcore:ap-northeast-2:061525506239:runtime/rumAnalysisAgent-6f5T6RBNfQ/runtime-endpoint/rumAgentEndpoint"
+  tags                   = { Component = "agent-ui" }
+}
