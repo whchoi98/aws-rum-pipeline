@@ -12,6 +12,7 @@ __pycache__/
 *.pyc
 .vitest/
 coverage/
+cdk.out/
 .env
 .env.*
 *.local.json

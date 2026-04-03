@@ -9,7 +9,7 @@ Bedrock AgentCore 기반 분석 에이전트 포함.
 
 ## Tech Stack
 
-- **Infrastructure**: Terraform (HCL), AWS provider
+- **Infrastructure**: Terraform (HCL) + AWS CDK (TypeScript), AWS provider
 - **Lambda**: Python 3.12, pytest
 - **SDK**: TypeScript, esbuild, vitest
 - **Mobile SDK (iOS)**: Swift 5.9+, Swift Package Manager
@@ -47,6 +47,9 @@ agentcore/          - Bedrock AgentCore RUM 분석 에이전트 + Web UI
   agent.py          - 에이전트 메인 (Strands, MCP)
   web/              - Next.js 14 Web UI
   web-app/          - 별도 Next.js 앱 (필요시)
+cdk/                - AWS CDK (TypeScript) — Terraform과 동일 인프라
+  lib/constructs/   - 10개 Construct (Terraform 모듈과 1:1 대응)
+  lib/rum-pipeline-stack.ts - 메인 스택
 scripts/            - 빌드/배포/테스트 쉘 스크립트
 docs/               - 아키텍처 문서, ADR, 런북
 .claude/            - Claude Code 설정 (hooks, skills)
@@ -83,6 +86,11 @@ cd mobile-sdk-android && ./gradlew :rum-sdk:test
 # Simulator
 cd simulator && npm test
 cd simulator && docker build -t rum-simulator .
+
+# CDK
+cd cdk && npm install
+cd cdk && npx cdk synth         # CloudFormation 생성
+cd cdk && npx cdk deploy        # 배포
 
 # AgentCore
 cd agentcore && python3 agent.py

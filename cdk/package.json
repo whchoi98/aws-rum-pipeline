@@ -1,0 +1,23 @@
+{
+  "name": "rum-pipeline-cdk",
+  "version": "0.1.0",
+  "description": "AWS Custom RUM Pipeline — CDK Infrastructure",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "aws-cdk": "^2.170.0"
+  }
+}

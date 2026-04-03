@@ -78,12 +78,28 @@ Browser
 | grafana | AMG Workspace | Athena 데이터소스 |
 | partition-repair | Lambda, EventBridge | 파티션 자동 복구 |
 | athena-query | Lambda | 쿼리 실행 API |
-| agent-ui | ECS/EKS or CloudFront | AgentCore Web UI 호스팅 |
+| agent-ui | CloudFront + ALB + EC2 | AgentCore Web UI 호스팅 |
 
 ### Deployed Resources (ap-northeast-2)
 - API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
 - Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com`
 - SSM Parameter: `/rum-pipeline/dev/api-keys`
+
+### CDK (TypeScript 대안)
+| Construct | Terraform 대응 | 설명 |
+|-----------|---------------|------|
+| S3DataLake | s3-data-lake | S3 버킷 + 생명주기 |
+| GlueCatalog | glue-catalog | Glue DB + 3개 테이블 |
+| Firehose | firehose | Firehose + Transform Lambda |
+| Security | security | WAF + SSM + Authorizer |
+| ApiGateway | api-gateway | HTTP API + Ingest Lambda |
+| Grafana | grafana | Managed Grafana + Athena WG |
+| Monitoring | monitoring | CloudWatch Dashboard |
+| PartitionRepair | partition-repair | 파티션 복구 + EventBridge |
+| AthenaQuery | athena-query | Athena Query Lambda |
+| AgentUi | agent-ui | CloudFront + ALB + EC2 |
+
+CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 
 ## Key Design Decisions
 

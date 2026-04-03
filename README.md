@@ -239,6 +239,12 @@ rum/
 │   ├── Dockerfile                    # Python 3.11 arm64 컨테이너
 │   └── streamable_http_sigv4.py      # MCP Gateway SigV4 signing
 │
+├── cdk/                              # AWS CDK (TypeScript) — Terraform 대안
+│   ├── lib/rum-pipeline-stack.ts     # 메인 스택 (10개 Construct 조합)
+│   ├── lib/constructs/               # 10개 Construct (TF 모듈 1:1 대응)
+│   │   └── helpers.ts                # Lambda/IAM/Glue 공유 헬퍼
+│   └── bin/app.ts                    # CDK 앱 엔트리포인트
+│
 ├── scripts/                          # 운영 스크립트
 │   ├── setup.sh                      # 통합 설치 (6개 Phase)
 │   ├── setup-agentcore.sh            # AgentCore 전체 셋업
@@ -722,6 +728,17 @@ SDK (Web/iOS/Android) → WAF → HTTP API → Lambda Authorizer → Ingest Lamb
 | `partition-repair` | Auto-register Glue partitions (15min) |
 | `athena-query` | Athena SQL execution Lambda for AgentCore |
 | `agent-ui` | CloudFront + ALB + EC2 for AI chat UI |
+
+### CDK (TypeScript Alternative)
+
+Same infrastructure as Terraform, written in TypeScript. 10 Constructs map 1:1 to Terraform modules.
+
+```bash
+cd cdk && npm install
+npx cdk synth     # Generate CloudFormation
+npx cdk deploy    # Deploy
+npx cdk diff      # Preview changes
+```
 
 ---
 
