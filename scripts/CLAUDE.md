@@ -9,8 +9,8 @@
 | `setup.sh` | 전체 프로젝트 설치 (`./setup.sh all`) |
 | `test-ingestion.sh` | 엔드투엔드 인제스천 파이프라인 테스트 |
 | `provision-grafana.sh` | Grafana 워크스페이스 데이터소스/대시보드 프로비저닝 |
-| `setup-agentcore.sh` | AgentCore 환경 설정 (agentcore/ 에 위치) |
-| `deploy-unified-dashboard.py` | 통합 Grafana 대시보드 배포 (agentcore/ 에 위치) |
+| `setup-agentcore.sh` | AgentCore 환경 설정 (scripts/ 에 위치) |
+| `deploy-unified-dashboard.py` | 통합 Grafana 대시보드 배포 (scripts/ 에 위치) |
 
 ## Key Commands
 ```bash

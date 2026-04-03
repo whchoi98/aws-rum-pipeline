@@ -3,7 +3,7 @@
 ## System Overview
 
 AWS Custom RUM Pipeline은 Datadog RUM을 대체하는 서버리스 이벤트 수집 및 분석 시스템.
-브라우저 SDK(TypeScript)가 RUM 이벤트를 수집하고, API Gateway를 통해 AWS 인프라로 전달.
+브라우저 SDK(TypeScript) 및 모바일 SDK(iOS Swift, Android Kotlin)가 RUM 이벤트를 수집하고, API Gateway를 통해 AWS 인프라로 전달.
 이벤트는 Firehose를 거쳐 S3에 저장되고, Glue/Athena로 쿼리 가능.
 Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 
@@ -11,6 +11,8 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 
 ### Ingestion Layer
 - **sdk/** — TypeScript RUM SDK. 브라우저에서 페이지뷰, 에러, 사용자 액션 이벤트 수집. esbuild 번들.
+- **mobile-sdk-ios/** — iOS RUM SDK (Swift 5.9+, SPM). iOS 15+ 지원. 브라우저 SDK와 동일한 이벤트 스키마.
+- **mobile-sdk-android/** — Android RUM SDK (Kotlin 1.9+, Gradle). minSdk 26 지원. 브라우저 SDK와 동일한 이벤트 스키마.
 - **terraform/modules/api-gateway/** — HTTP API Gateway. `/ingest` 엔드포인트 노출. Lambda Authorizer 연결.
 - **lambda/authorizer/** — JWT/API Key 검증 Lambda Authorizer. 인증 실패 시 403.
 - **lambda/ingest/** — HTTP 요청을 Kinesis Firehose로 포워딩하는 브리지 Lambda.

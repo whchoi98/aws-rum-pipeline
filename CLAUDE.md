@@ -12,6 +12,8 @@ Bedrock AgentCore 기반 분석 에이전트 포함.
 - **Infrastructure**: Terraform (HCL), AWS provider
 - **Lambda**: Python 3.12, pytest
 - **SDK**: TypeScript, esbuild, vitest
+- **Mobile SDK (iOS)**: Swift 5.9+, Swift Package Manager
+- **Mobile SDK (Android)**: Kotlin 1.9+, Gradle
 - **Simulator**: TypeScript, Docker
 - **Agent UI**: TypeScript, Next.js 14, Docker
 - **AgentCore**: Python 3.12, Bedrock AgentCore
@@ -19,7 +21,7 @@ Bedrock AgentCore 기반 분석 에이전트 포함.
 ## Project Structure
 
 ```
-terraform/          - Terraform 루트 모듈 + 8개 서브모듈
+terraform/          - Terraform 루트 모듈 + 10개 서브모듈
   modules/
     s3-data-lake/   - S3 버킷 (raw/processed/athena-results)
     glue-catalog/   - Glue 데이터베이스 및 테이블 스키마
@@ -38,6 +40,8 @@ lambda/             - Python Lambda 함수
   partition-repair/ - Glue 파티션 MSCK REPAIR
   athena-query/     - Athena 쿼리 실행 및 결과 반환
 sdk/                - TypeScript RUM SDK (브라우저 클라이언트)
+mobile-sdk-ios/     - iOS RUM SDK (Swift, SPM)
+mobile-sdk-android/ - Android RUM SDK (Kotlin, Gradle)
 simulator/          - RUM 트래픽 생성기 (Docker)
 agentcore/          - Bedrock AgentCore RUM 분석 에이전트 + Web UI
   agent.py          - 에이전트 메인 (Strands, MCP)
@@ -67,6 +71,14 @@ cd lambda/athena-query && python3 -m pytest test_handler.py -v
 # SDK 테스트
 cd sdk && npm test           # vitest
 cd sdk && npm run build      # esbuild
+
+# iOS SDK
+cd mobile-sdk-ios && swift build
+cd mobile-sdk-ios && swift test
+
+# Android SDK
+cd mobile-sdk-android && ./gradlew :rum-sdk:build
+cd mobile-sdk-android && ./gradlew :rum-sdk:test
 
 # Simulator
 cd simulator && npm test

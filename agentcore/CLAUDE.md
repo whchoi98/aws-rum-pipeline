@@ -12,7 +12,7 @@ Next.js 14 Web UI를 통해 사용자와 채팅 인터페이스 제공.
 - `web/` — Next.js 14 Web UI (에이전트 채팅 인터페이스)
 - `web-app/` — 별도 배포 가능한 Next.js 앱
 - `Dockerfile` — 에이전트 컨테이너 이미지
-- `setup-agentcore.sh` — AgentCore 환경 설정 스크립트
+- `scripts/setup-agentcore.sh` — AgentCore 환경 설정 스크립트 (프로젝트 루트 `scripts/` 에 위치)
 
 ## Key Commands
 ```bash

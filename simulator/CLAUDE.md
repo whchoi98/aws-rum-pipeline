@@ -8,6 +8,8 @@ Docker 컨테이너로 실행 가능.
 ## Key Files
 - `src/` — 시뮬레이터 소스 (TypeScript)
 - `tests/` — vitest 테스트
+- `k8s/` — EKS 배포 설정 (CronJob YAML 포함)
+  - `k8s/cronjob.yaml` — EKS CronJob (5분 주기 트래픽 생성)
 - `Dockerfile` — 컨테이너 이미지 빌드
 - `package.json` — 의존성 및 스크립트
 - `tsconfig.json` — TypeScript 설정
