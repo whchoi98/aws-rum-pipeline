@@ -1,6 +1,6 @@
-__pycache__/
-*.pyc
-.pytest_cache/
-terraform/.terraform/
-terraform/.terraform.lock.hcl
+node_modules/
+dist/
 *.zip
+tfplan
+.pytest_cache/
+__pycache__/
