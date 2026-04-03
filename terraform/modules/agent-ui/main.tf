@@ -1,6 +1,10 @@
 # terraform/modules/agent-ui/main.tf
 # CloudFront → ALB → EC2 (Next.js RUM Agent UI)
 
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 data "aws_ami" "al2023_arm" {
   most_recent = true
   owners      = ["amazon"]
@@ -21,16 +25,11 @@ resource "aws_security_group" "alb" {
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront.id]
+    description     = "CloudFront only"
   }
   egress {
     from_port   = 0
@@ -181,10 +180,9 @@ resource "aws_lb_listener" "http" {
 # --- CloudFront ---
 
 resource "aws_cloudfront_distribution" "agent" {
-  enabled             = true
-  comment             = "RUM Agent UI"
-  default_root_object = "/"
-  price_class         = "PriceClass_200"
+  enabled     = true
+  comment     = "RUM Agent UI"
+  price_class = "PriceClass_200"
 
   origin {
     domain_name = aws_lb.agent.dns_name
@@ -205,13 +203,13 @@ resource "aws_cloudfront_distribution" "agent" {
 
     forwarded_values {
       query_string = true
-      headers      = ["Host", "Origin", "Authorization"]
+      headers      = ["*"]
       cookies {
         forward = "all"
       }
     }
 
-    viewer_protocol_policy = "redirect-to-https"
+    viewer_protocol_policy = "allow-all"
     min_ttl                = 0
     default_ttl            = 0
     max_ttl                = 0
