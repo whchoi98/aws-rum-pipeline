@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    strands-agents \
+    strands-agents-tools \
+    boto3 \
+    "bedrock-agentcore<=0.1.5" \
+    mcp \
+    httpx \
+    httpx-sse \
+    aws-requests-auth
+
+COPY streamable_http_sigv4.py .
+COPY agent.py .
+
+EXPOSE 8080
+
+CMD ["python", "agent.py"]
