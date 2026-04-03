@@ -2,5 +2,10 @@ node_modules/
 dist/
 *.zip
 tfplan
+*.tfplan
+.terraform/
 .pytest_cache/
 __pycache__/
+*.pyc
+.vitest/
+coverage/
