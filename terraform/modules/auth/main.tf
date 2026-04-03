@@ -37,6 +37,7 @@ resource "aws_cognito_user_pool" "agent_users" {
   tags = var.tags
 }
 
+
 # ─── Cognito Hosted UI 도메인 ───
 
 resource "aws_cognito_user_pool_domain" "main" {
