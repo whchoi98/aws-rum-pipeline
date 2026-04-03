@@ -6,7 +6,7 @@ export interface RumEvent {
   user_id: string;
   device_id: string;
   timestamp: number;
-  platform: 'web';
+  platform: 'web' | 'ios' | 'android';
   app_version: string;
   event_type: 'performance' | 'action' | 'error' | 'navigation' | 'resource';
   event_name: string;
@@ -56,15 +56,26 @@ function makePayload(type: RumEvent['event_type'], scenario: ScenarioConfig): Re
   }
 }
 
-function getEventName(type: RumEvent['event_type']): string {
-  const names: Record<RumEvent['event_type'], string[]> = {
+function getEventName(type: RumEvent['event_type'], platform: string): string {
+  if (platform === 'ios' || platform === 'android') {
+    const mobileNames: Record<RumEvent['event_type'], string[]> = {
+      performance: ['app_start', 'screen_load', 'frame_drop'],
+      navigation: ['screen_view', 'screen_transition'],
+      resource: ['fetch', 'xhr'],
+      error: platform === 'android' ? ['crash', 'anr', 'unhandled_exception'] : ['crash', 'oom', 'unhandled_exception'],
+      action: ['tap', 'swipe', 'scroll'],
+    };
+    const opts = mobileNames[type];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+  const webNames: Record<RumEvent['event_type'], string[]> = {
     performance: ['lcp', 'cls', 'inp'],
     navigation: Math.random() < 0.8 ? ['page_view'] : ['route_change'],
     resource: Math.random() < 0.6 ? ['fetch'] : ['xhr'],
     error: Math.random() < 0.7 ? ['js_error'] : ['unhandled_rejection'],
     action: Math.random() < 0.8 ? ['click'] : ['scroll'],
   };
-  const opts = names[type];
+  const opts = webNames[type];
   return opts[Math.floor(Math.random() * opts.length)];
 }
 
@@ -79,7 +90,7 @@ export function generateEvents(session: SessionContext, count: number, scenario:
       platform: session.platform,
       app_version: session.app_version,
       event_type: type,
-      event_name: getEventName(type),
+      event_name: getEventName(type, session.platform),
       payload: makePayload(type, scenario),
       context: session.context,
     };
