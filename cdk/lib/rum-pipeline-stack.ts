@@ -10,6 +10,7 @@ import { Grafana } from './constructs/grafana';
 import { PartitionRepair } from './constructs/partition-repair';
 import { AthenaQuery } from './constructs/athena-query';
 import { AgentUi } from './constructs/agent-ui';
+import { Auth } from './constructs/auth';
 
 export interface RumPipelineStackProps extends cdk.StackProps {
   projectName: string;
@@ -18,6 +19,7 @@ export interface RumPipelineStackProps extends cdk.StackProps {
   publicSubnetIds?: string[];
   agentcoreEndpointArn?: string;
   allowedOrigins?: string[];
+  ssoMetadataUrl?: string;
 }
 
 export class RumPipelineStack extends cdk.Stack {
@@ -107,14 +109,26 @@ export class RumPipelineStack extends cdk.Stack {
       lambdaSourceDir: `${lambdaBase}/athena-query`,
     });
 
-    // ─── 10. Agent UI (선택) ───
+    // ─── 10. Agent UI + Auth (선택) ───
     if (vpcId && publicSubnetIds && agentcoreEndpointArn) {
-      new AgentUi(this, 'AgentUi', {
+      const agentUi = new AgentUi(this, 'AgentUi', {
         projectName,
         vpcId,
         publicSubnetIds,
         agentcoreEndpointArn,
       });
+
+      // Cognito + Lambda@Edge 인증
+      const auth = new Auth(this, 'Auth', {
+        projectName,
+        cloudfrontDomainName: agentUi.cloudfrontDomainName,
+        lambdaSourceDir: `${lambdaBase}/../lambda/edge-auth`,
+        ssoMetadataUrl: props.ssoMetadataUrl,
+      });
+
+      // CloudFront에 Lambda@Edge 연결은 AgentUi props로 전달
+      // 참고: 순환 의존성 때문에 CDK에서는 두 번째 배포에서 연결
+      // 또는 agentUi에 직접 edgeAuthFunction 전달
     }
 
     // ─── Outputs ───

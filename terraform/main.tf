@@ -127,15 +127,33 @@ module "athena_query" {
 }
 
 # -----------------------------------------------------------------------------
+# Auth — Cognito User Pool + SSO + Lambda@Edge
+# -----------------------------------------------------------------------------
+
+module "auth" {
+  source            = "./modules/auth"
+  project_name      = var.project_name
+  cloudfront_domain = module.agent_ui.cloudfront_domain
+  sso_metadata_url  = var.sso_metadata_url
+  lambda_source_dir = "${path.module}/../lambda/edge-auth"
+  tags              = { Component = "auth" }
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Agent UI — CloudFront + ALB + EC2 (Next.js)
 # -----------------------------------------------------------------------------
 
 module "agent_ui" {
-  source                 = "./modules/agent-ui"
-  project_name           = var.project_name
-  vpc_id                 = var.vpc_id
-  public_subnet_ids      = var.public_subnet_ids
-  instance_type          = "t4g.large"
-  agentcore_endpoint_arn = var.agentcore_endpoint_arn
-  tags                   = { Component = "agent-ui" }
+  source                  = "./modules/agent-ui"
+  project_name            = var.project_name
+  vpc_id                  = var.vpc_id
+  public_subnet_ids       = var.public_subnet_ids
+  instance_type           = "t4g.large"
+  agentcore_endpoint_arn  = var.agentcore_endpoint_arn
+  edge_auth_qualified_arn = module.auth.edge_auth_qualified_arn
+  tags                    = { Component = "agent-ui" }
 }

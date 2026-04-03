@@ -43,11 +43,11 @@ const SYSTEM_PROMPT = `당신은 RUM (Real User Monitoring) 데이터 분석 전
 - 개선 제안 (있으면)
 - 항상 한국어`;
 
-async function queryAthena(sql: string): Promise<string> {
+async function queryAthena(sql: string, sessionId?: string): Promise<string> {
   try {
     const command = new InvokeCommand({
       FunctionName: ATHENA_LAMBDA,
-      Payload: Buffer.from(JSON.stringify({ input: { sql } })),
+      Payload: Buffer.from(JSON.stringify({ input: { sql, session_id: sessionId } })),
     });
     const resp = await lambda.send(command);
     const payload = new TextDecoder().decode(resp.Payload);
@@ -84,10 +84,20 @@ async function callBedrock(messages: Array<{role: string; content: string}>): Pr
 }
 
 export async function POST(request: NextRequest) {
+  // Lambda@Edge가 주입한 사용자 식별 헤더
+  const userSub = request.headers.get('x-user-sub');
+  const userEmail = request.headers.get('x-user-email');
+  if (!userSub) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  }
+
   const { prompt } = await request.json();
   if (!prompt) {
     return new Response(JSON.stringify({ error: 'prompt is required' }), { status: 400 });
   }
+
+  // 사용자별 세션 ID — AgentCore Memory에서 히스토리 분리에 사용
+  const sessionId = userSub;
 
   const encoder = new TextEncoder();
 
@@ -127,7 +137,7 @@ export async function POST(request: NextRequest) {
         let queryResults = '';
         for (const sql of sqls) {
           send({ type: 'chunk', content: `\`\`\`sql\n${sql}\n\`\`\`\n\n` });
-          const result = await queryAthena(sql);
+          const result = await queryAthena(sql, sessionId);
 
           try {
             const parsed = JSON.parse(result);
@@ -173,7 +183,7 @@ export async function POST(request: NextRequest) {
           let moreResults = '';
           for (const sql of moreSqls) {
             send({ type: 'chunk', content: `\`\`\`sql\n${sql}\n\`\`\`\n\n` });
-            const result = await queryAthena(sql);
+            const result = await queryAthena(sql, sessionId);
             try {
               const parsed = JSON.parse(result);
               if (parsed.error) {

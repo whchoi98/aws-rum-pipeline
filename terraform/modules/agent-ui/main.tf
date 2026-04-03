@@ -213,6 +213,15 @@ resource "aws_cloudfront_distribution" "agent" {
     min_ttl                = 0
     default_ttl            = 0
     max_ttl                = 0
+
+    dynamic "lambda_function_association" {
+      for_each = var.edge_auth_qualified_arn != "" ? [1] : []
+      content {
+        event_type   = "viewer-request"
+        lambda_arn   = var.edge_auth_qualified_arn
+        include_body = false
+      }
+    }
   }
 
   viewer_certificate {

@@ -37,6 +37,9 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 
 ### Security Layer
 - **terraform/modules/security/** — WAF WebACL, API Key 관리, IAM 역할/정책.
+- **terraform/modules/auth/** — Cognito User Pool + SSO IdP + Lambda@Edge 인증.
+  - CloudFront viewer-request에서 JWT 검증, 미인증 시 Cognito Hosted UI 리다이렉트.
+  - `x-user-sub` 헤더로 사용자 식별, AgentCore Memory에서 사용자별 대화 히스토리 분리.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore 기반 RUM 분석 에이전트.

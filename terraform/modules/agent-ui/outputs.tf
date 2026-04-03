@@ -3,6 +3,11 @@ output "cloudfront_url" {
   value       = "https://${aws_cloudfront_distribution.agent.domain_name}"
 }
 
+output "cloudfront_domain" {
+  description = "CloudFront domain name"
+  value       = aws_cloudfront_distribution.agent.domain_name
+}
+
 output "alb_dns" {
   description = "ALB DNS name"
   value       = aws_lb.agent.dns_name

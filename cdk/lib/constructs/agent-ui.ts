@@ -13,10 +13,12 @@ export interface AgentUiProps {
   publicSubnetIds: string[];
   agentcoreEndpointArn: string;
   instanceType?: string;
+  edgeAuthFunction?: cloudfront.experimental.EdgeFunction;
 }
 
 export class AgentUi extends Construct {
   public readonly cloudfrontUrl: string;
+  public readonly cloudfrontDomainName: string;
 
   constructor(scope: Construct, id: string, props: AgentUiProps) {
     super(scope, id);
@@ -139,6 +141,15 @@ systemctl daemon-reload
     });
 
     // ─── CloudFront ───
+    const edgeLambdas: cloudfront.EdgeLambda[] = [];
+    if (props.edgeAuthFunction) {
+      edgeLambdas.push({
+        eventType: cloudfront.LambdaEdgeEventType.VIEWER_REQUEST,
+        functionVersion: props.edgeAuthFunction.currentVersion,
+        includeBody: false,
+      });
+    }
+
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: new origins.HttpOrigin(alb.loadBalancerDnsName, {
@@ -149,11 +160,13 @@ systemctl daemon-reload
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+        edgeLambdas: edgeLambdas.length > 0 ? edgeLambdas : undefined,
       },
       priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
     });
 
     this.cloudfrontUrl = `https://${distribution.distributionDomainName}`;
+    this.cloudfrontDomainName = distribution.distributionDomainName;
 
     new cdk.CfnOutput(this, 'AgentUiUrl', {
       value: this.cloudfrontUrl,

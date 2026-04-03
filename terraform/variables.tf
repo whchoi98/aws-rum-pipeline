@@ -32,6 +32,12 @@ variable "agentcore_endpoint_arn" {
   type        = string
 }
 
+variable "sso_metadata_url" {
+  description = "SSO SAML metadata URL (IAM Identity Center). 빈 문자열이면 SSO 비활성화."
+  type        = string
+  default     = ""
+}
+
 variable "allowed_origins" {
   description = "CORS allowed origins for the API"
   type        = list(string)

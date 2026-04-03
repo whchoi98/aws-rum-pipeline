@@ -1,0 +1,7 @@
+{
+  "region": "ap-northeast-2",
+  "userPoolId": "<user-pool-id>",
+  "clientId": "<app-client-id>",
+  "cognitoDomain": "<project-name>.auth.ap-northeast-2.amazoncognito.com",
+  "identityProvider": "<sso-idp-name>"
+}
