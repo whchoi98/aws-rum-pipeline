@@ -17,6 +17,21 @@ variable "project_name" {
   default     = "rum-pipeline"
 }
 
+variable "vpc_id" {
+  description = "VPC ID for Agent UI deployment"
+  type        = string
+}
+
+variable "public_subnet_ids" {
+  description = "Public subnet IDs for Agent UI ALB"
+  type        = list(string)
+}
+
+variable "agentcore_endpoint_arn" {
+  description = "Bedrock AgentCore runtime endpoint ARN"
+  type        = string
+}
+
 variable "allowed_origins" {
   description = "CORS allowed origins for the API"
   type        = list(string)

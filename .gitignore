@@ -4,8 +4,15 @@ dist/
 tfplan
 *.tfplan
 .terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
 .pytest_cache/
 __pycache__/
 *.pyc
 .vitest/
 coverage/
+.env
+.env.*
+*.local.json
+settings.local.json

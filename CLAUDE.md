@@ -2,7 +2,7 @@
 
 ## Overview
 
-AWS Custom RUM Pipeline — Datadog RUM 대체 솔루션.
+AWS Custom RUM Pipeline — AWS 서버리스 기반 Real User Monitoring 솔루션.
 브라우저 SDK로 수집한 RUM 이벤트를 API Gateway → Lambda → Firehose → S3 경로로 처리하고,
 Glue/Athena로 쿼리 가능하게 만드는 서버리스 파이프라인.
 Bedrock AgentCore 기반 분석 에이전트 포함.

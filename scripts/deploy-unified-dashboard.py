@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Deploy Datadog RUM-style unified dashboard to Grafana."""
+"""Deploy RUM unified dashboard to Grafana."""
 import json, urllib.request, os
 
-GRAFANA_URL = "https://g-c8cc9b0a52.grafana-workspace.ap-northeast-2.amazonaws.com"
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com")
 TOKEN = os.environ["TOKEN"]
 DS_UID = "efhx8g5mrvuo0d"
 DB = "rum_pipeline_db"
@@ -230,7 +230,7 @@ dashboard = {
     "title": "RUM \u2014 \uc2e4\uc0ac\uc6a9\uc790 \ubaa8\ub2c8\ud130\ub9c1",
     "description": "\uc138\uc158, \uc131\ub2a5, \uc5d0\ub7ec, \ub9ac\uc18c\uc2a4, \uc0ac\uc6a9\uc790 \uc138\uc158 \ud1b5\ud569 \ub300\uc2dc\ubcf4\ub4dc",
     "schemaVersion": 39, "version": 1, "editable": True,
-    "tags": ["rum", "monitoring", "datadog-style"],
+    "tags": ["rum", "monitoring"],
     "time": {"from": "now-24h", "to": "now"},
     "templating": {"list": [
         {"name": "platform", "label": "\ud50c\ub7ab\ud3fc", "type": "custom",

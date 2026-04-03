@@ -1234,7 +1234,7 @@ spec:
             image: ${ECR_REPO}/rum-simulator:latest
             env:
             - name: RUM_API_ENDPOINT
-              value: "https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com"
+              value: "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com"
             - name: EVENTS_PER_BATCH
               value: "100"
             - name: CONCURRENT_SESSIONS
@@ -1257,7 +1257,7 @@ spec:
 
 ```bash
 cd simulator && npm install
-RUM_API_ENDPOINT=https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com \
+RUM_API_ENDPOINT=https://<api-id>.execute-api.ap-northeast-2.amazonaws.com \
 RUM_API_KEY=<your-key> \
 EVENTS_PER_BATCH=10 \
 CONCURRENT_SESSIONS=2 \

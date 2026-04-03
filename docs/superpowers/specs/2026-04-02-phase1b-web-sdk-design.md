@@ -207,7 +207,7 @@ spec:
             image: {ECR_REPO}/rum-simulator:latest
             env:
             - name: RUM_API_ENDPOINT
-              value: "https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com"
+              value: "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com"
             - name: RUM_API_KEY
               valueFrom:
                 secretKeyRef:

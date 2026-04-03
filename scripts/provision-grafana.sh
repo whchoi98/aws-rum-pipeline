@@ -7,9 +7,9 @@
 #   - GRAFANA_API_KEY: Service account token with Admin role
 #   - AWS_REGION: AWS region (default: ap-northeast-2)
 #   - ATHENA_WORKGROUP: Athena workgroup name (default: rum-pipeline-athena)
-#   - S3_BUCKET: S3 bucket name for Athena results (default: rum-pipeline-data-lake-061525506239)
+#   - ACCOUNT_ID: AWS account ID (required)
+#   - S3_BUCKET: S3 bucket name for Athena results (default: rum-pipeline-data-lake-<account-id>)
 #   - GLUE_DATABASE: Glue database name (default: rum_pipeline_db)
-#   - ACCOUNT_ID: AWS account ID (default: 061525506239)
 #
 # Usage:
 #   export GRAFANA_URL=https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com
@@ -22,9 +22,9 @@ GRAFANA_URL="${GRAFANA_URL:?Set GRAFANA_URL to the Grafana workspace URL}"
 GRAFANA_API_KEY="${GRAFANA_API_KEY:?Set GRAFANA_API_KEY to a Grafana service account token}"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 ATHENA_WORKGROUP="${ATHENA_WORKGROUP:-rum-pipeline-athena}"
-S3_BUCKET="${S3_BUCKET:-rum-pipeline-data-lake-061525506239}"
+ACCOUNT_ID="${ACCOUNT_ID:?Set ACCOUNT_ID to your AWS account ID}"
+S3_BUCKET="${S3_BUCKET:-rum-pipeline-data-lake-${ACCOUNT_ID}}"
 GLUE_DATABASE="${GLUE_DATABASE:-rum_pipeline_db}"
-ACCOUNT_ID="${ACCOUNT_ID:-061525506239}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DASHBOARDS_DIR="${SCRIPT_DIR}/../terraform/modules/grafana/dashboards"

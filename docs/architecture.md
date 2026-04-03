@@ -2,7 +2,7 @@
 
 ## System Overview
 
-AWS Custom RUM Pipeline은 Datadog RUM을 대체하는 서버리스 이벤트 수집 및 분석 시스템.
+AWS Custom RUM Pipeline은 서버리스 기반 이벤트 수집 및 분석 시스템.
 브라우저 SDK(TypeScript) 및 모바일 SDK(iOS Swift, Android Kotlin)가 RUM 이벤트를 수집하고, API Gateway를 통해 AWS 인프라로 전달.
 이벤트는 Firehose를 거쳐 S3에 저장되고, Glue/Athena로 쿼리 가능.
 Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
@@ -81,8 +81,8 @@ Browser
 | agent-ui | ECS/EKS or CloudFront | AgentCore Web UI 호스팅 |
 
 ### Deployed Resources (ap-northeast-2)
-- API Endpoint: `https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com`
-- Grafana: `https://g-c8cc9b0a52.grafana-workspace.ap-northeast-2.amazonaws.com`
+- API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
+- Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com`
 - SSM Parameter: `/rum-pipeline/dev/api-keys`
 
 ## Key Design Decisions

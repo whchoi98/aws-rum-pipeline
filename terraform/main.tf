@@ -133,9 +133,9 @@ module "athena_query" {
 module "agent_ui" {
   source                 = "./modules/agent-ui"
   project_name           = var.project_name
-  vpc_id                 = "vpc-04a740903971ad736"
-  public_subnet_ids      = ["subnet-065fef949a11a8d7b", "subnet-04246258dd0aa2b66"]
+  vpc_id                 = var.vpc_id
+  public_subnet_ids      = var.public_subnet_ids
   instance_type          = "t4g.large"
-  agentcore_endpoint_arn = "arn:aws:bedrock-agentcore:ap-northeast-2:061525506239:runtime/rumAnalysisAgent-6f5T6RBNfQ/runtime-endpoint/rumAgentEndpoint"
+  agentcore_endpoint_arn = var.agentcore_endpoint_arn
   tags                   = { Component = "agent-ui" }
 }

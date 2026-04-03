@@ -13,10 +13,10 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: simulator
-            image: 061525506239.dkr.ecr.ap-northeast-2.amazonaws.com/rum-simulator:latest
+            image: <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/rum-simulator:latest
             env:
             - name: RUM_API_ENDPOINT
-              value: "https://ucsstumep1.execute-api.ap-northeast-2.amazonaws.com"
+              value: "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com"
             - name: EVENTS_PER_BATCH
               value: "100"
             - name: CONCURRENT_SESSIONS

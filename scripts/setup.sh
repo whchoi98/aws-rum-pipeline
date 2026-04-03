@@ -241,7 +241,7 @@ case "${PHASE}" in
         log "  API:      ${API_ENDPOINT}"
         log "  Grafana:  ${GRAFANA_URL}"
         log "  CW 대시보드: https://${REGION}.console.aws.amazon.com/cloudwatch/home?region=${REGION}#dashboards/dashboard/rum-pipeline-dashboard"
-        log "  SSO 포털:  https://d-9b6773f833.awsapps.com/start"
+        log "  SSO 포털:  AWS SSO 콘솔에서 확인"
         ;;
     infra)     deploy_infra ;;
     sdk)       build_sdk ;;

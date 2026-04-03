@@ -2,16 +2,14 @@
 
 **Date:** 2026-04-01
 **Status:** Draft
-**Replaces:** Datadog RUM (Web + Mobile)
-
 ## 1. Overview
 
-Datadog RUM을 대체하는 AWS 서버리스 기반 Custom RUM(Real User Monitoring) 파이프라인.
+AWS 서버리스 기반 Custom RUM(Real User Monitoring) 파이프라인.
 Web과 Mobile에서 사용자 행동, 성능, 에러를 수집하여 S3 Data Lake에 저장하고, Athena + Grafana로 분석/시각화한다.
 
 ### Goals
 
-- Datadog RUM 대비 **~90% 비용 절감** (월 $1,500~3,000 → ~$150)
+- AWS 서버리스 기반 **경제적인 RUM** (~$124/월, DAU 5만 기준)
 - Web + Mobile **단일 파이프라인**으로 통합
 - Core Web Vitals, 사용자 행동, 에러 모니터링 지원
 - 세션 리플레이는 Phase 2로 분리
