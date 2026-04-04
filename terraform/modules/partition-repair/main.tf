@@ -47,9 +47,11 @@ resource "aws_iam_role_policy" "partition_repair_athena" {
       {
         Effect = "Allow"
         Action = [
+          "glue:GetDatabase",
           "glue:GetTable",
           "glue:GetPartitions",
-          "glue:BatchCreatePartition"
+          "glue:BatchCreatePartition",
+          "glue:CreatePartition"
         ]
         Resource = "*"
       },
