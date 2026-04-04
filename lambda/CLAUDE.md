@@ -13,6 +13,7 @@ RUM Pipeline의 Python 3.12 Lambda 함수들.
 | `transform/` | Firehose Data Transformation | JSON 정규화, 스키마 검증 |
 | `partition-repair/` | EventBridge (스케줄) | Glue 파티션 MSCK REPAIR |
 | `athena-query/` | API Gateway or direct invoke | Athena 쿼리 실행/결과 반환 |
+| `edge-auth/` | CloudFront Lambda@Edge (viewer-request) | Cognito JWT 검증, SSO 리다이렉트 (Node.js 20) |
 
 ## Key Files (per function)
 - `handler.py` — Lambda 핸들러 진입점

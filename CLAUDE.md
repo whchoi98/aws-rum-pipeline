@@ -21,7 +21,7 @@ Bedrock AgentCore 기반 분석 에이전트 포함.
 ## Project Structure
 
 ```
-terraform/          - Terraform 루트 모듈 + 10개 서브모듈
+terraform/          - Terraform 루트 모듈 + 11개 서브모듈
   modules/
     s3-data-lake/   - S3 버킷 (raw/processed/athena-results)
     glue-catalog/   - Glue 데이터베이스 및 테이블 스키마
@@ -33,12 +33,14 @@ terraform/          - Terraform 루트 모듈 + 10개 서브모듈
     partition-repair/ - Glue 파티션 자동 복구 Lambda
     athena-query/   - Athena 쿼리 결과 조회 Lambda
     agent-ui/       - AgentCore UI 호스팅 인프라
+    auth/           - Cognito SSO + Lambda@Edge 인증
 lambda/             - Python Lambda 함수
   authorizer/       - JWT/API Key 검증 Lambda Authorizer
   ingest/           - HTTP → Firehose 브리지
   transform/        - Firehose 이벤트 변환 (JSON 정규화)
   partition-repair/ - Glue 파티션 MSCK REPAIR
   athena-query/     - Athena 쿼리 실행 및 결과 반환
+  edge-auth/        - CloudFront Lambda@Edge JWT 검증 (Node.js)
 sdk/                - TypeScript RUM SDK (브라우저 클라이언트)
 mobile-sdk-ios/     - iOS RUM SDK (Swift, SPM)
 mobile-sdk-android/ - Android RUM SDK (Kotlin, Gradle)
@@ -48,7 +50,7 @@ agentcore/          - Bedrock AgentCore RUM 분석 에이전트 + Web UI
   web/              - Next.js 14 Web UI
   web-app/          - 별도 Next.js 앱 (필요시)
 cdk/                - AWS CDK (TypeScript) — Terraform과 동일 인프라
-  lib/constructs/   - 10개 Construct (Terraform 모듈과 1:1 대응)
+  lib/constructs/   - 11개 Construct (Terraform 모듈과 1:1 대응, auth 포함)
   lib/rum-pipeline-stack.ts - 메인 스택
 scripts/            - 빌드/배포/테스트 쉘 스크립트
 docs/               - 아키텍처 문서, ADR, 런북

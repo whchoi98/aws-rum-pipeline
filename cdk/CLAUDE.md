@@ -2,7 +2,7 @@
 
 ## Role
 Terraform과 동일한 RUM Pipeline 인프라를 AWS CDK (TypeScript)로 관리.
-10개 Construct가 Terraform 10개 모듈과 1:1 대응.
+11개 Construct가 Terraform 11개 모듈과 1:1 대응.
 
 ## Key Files
 | 파일 | 역할 | Terraform 대응 |
@@ -19,6 +19,7 @@ Terraform과 동일한 RUM Pipeline 인프라를 AWS CDK (TypeScript)로 관리.
 | `lib/constructs/partition-repair.ts` | 파티션 복구 Lambda + EventBridge | `modules/partition-repair/` |
 | `lib/constructs/athena-query.ts` | Athena Query Lambda | `modules/athena-query/` |
 | `lib/constructs/agent-ui.ts` | CloudFront + ALB + EC2 | `modules/agent-ui/` |
+| `lib/constructs/auth.ts` | Cognito + SSO + Lambda@Edge | `modules/auth/` |
 
 ## Key Commands
 ```bash

@@ -178,7 +178,7 @@ cd rum
 
 ```
 rum/
-├── terraform/                        # IaC — Terraform 루트 + 10개 모듈
+├── terraform/                        # IaC — Terraform 루트 + 11개 모듈
 │   ├── main.tf                       # 루트 모듈 (모든 모듈 연결)
 │   ├── variables.tf                  # 입력 변수 (region, project_name 등)
 │   ├── outputs.tf                    # 출력값 (endpoints, ARNs)
@@ -192,14 +192,16 @@ rum/
 │       ├── grafana/                  # Managed Grafana + Athena Workgroup
 │       ├── partition-repair/         # Glue 파티션 자동 등록 (EventBridge)
 │       ├── athena-query/             # Athena SQL 실행 Lambda
-│       └── agent-ui/                 # CloudFront + ALB + EC2 인프라
+│       ├── agent-ui/                 # CloudFront + ALB + EC2 인프라
+│       └── auth/                     # Cognito SSO + Lambda@Edge 인증
 │
 ├── lambda/                           # Lambda 함수 (Python 3.12)
 │   ├── authorizer/                   # API Key 검증 (SSM 캐싱)
 │   ├── ingest/                       # HTTP → Firehose 포워딩
 │   ├── transform/                    # 스키마 검증 + PII 제거 + 파티셔닝
 │   ├── partition-repair/             # MSCK REPAIR TABLE 자동 실행
-│   └── athena-query/                 # Athena SQL 쿼리 실행 (AgentCore용)
+│   ├── athena-query/                 # Athena SQL 쿼리 실행 (AgentCore용)
+│   └── edge-auth/                    # CloudFront Lambda@Edge JWT 검증 (Node.js)
 │
 ├── sdk/                              # Web RUM SDK (TypeScript)
 │   ├── src/                          # buffer, transport, collectors
@@ -471,18 +473,21 @@ kubectl get cronjob -n rum
 
 ## 대시보드
 
-### Grafana (RUM Unified Dashboard)
+### Grafana (관리자 대시보드 — 43패널, 9섹션)
 
-**URL:** https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com
+**URL:** https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com/d/rum-unified-v2
 
-| 섹션 | 설명 | 패널 수 |
-|------|------|---------|
-| 상단 KPI | Overview | 세션/뷰/에러/크래시/에러율/액션/리소스 |
-| 성능 개요 | Performance | LCP/CLS/INP Gauge + 등급분포 + 백분위수 |
-| 크래시 및 에러 | Crashes & Errors | 크래시수/에러수/유형별/화면별/추이/상세목록 |
-| 리소스 분석 | Resources | 에러리소스/유형별/느린리소스 |
-| 모바일 바이탈 | Mobile Vitals | 느린렌더/프레임드랍/앱시작/화면전환 |
-| 사용자 세션 | Sessions | 플랫폼/브라우저/OS + 세션탐색기 |
+| 섹션 | 패널 수 | 주요 지표 |
+|------|---------|----------|
+| 📊 핵심 KPI | 8 | 세션/DAU/뷰/액션/에러/에러율/크래시/리소스 |
+| 📈 트래픽 추이 | 2 | 시간별 이벤트 유형 스택, 세션/사용자 추이 |
+| ⚡ Core Web Vitals | 4 | LCP/CLS/INP 게이지, 등급분포, 백분위수 |
+| 🔴 에러 & 크래시 | 4 | 시간별 추이, 유형 파이, 영향 범위, 상세 목록 |
+| 🌐 리소스 & 네트워크 | 3 | 유형 분포, 실패 리소스, 느린 리소스 |
+| 📱 모바일 바이탈 | 6 | iOS/Android 세션, 크래시, 화면별, OS 버전 |
+| 👥 사용자 분석 | 4 | 플랫폼/브라우저/OS/앱 버전 |
+| 📄 페이지별 성능 | 1 | CWV p75 + 에러율 (상위 20페이지) |
+| 🔍 세션 탐색기 | 1 | 최근 30세션 상세 (이벤트/에러/뷰/체류시간) |
 
 **필터:** 플랫폼 (전체/Web/iOS/Android), 페이지/화면
 
@@ -795,9 +800,9 @@ Auto-collects: Crashes, ANR (5s watchdog), screen transitions, app start time, t
 
 ## Dashboards
 
-### Grafana (RUM Unified Dashboard)
+### Grafana (Admin Dashboard — 43 panels, 9 sections)
 
-Unified dashboard with 6 sections: KPI bar, Performance Overview, Crashes & Errors, Resources Analysis, Mobile Vitals, User Sessions. Includes platform and page filters.
+Premium admin dashboard: KPI (8 stats), Traffic Trends (hourly stacked), Core Web Vitals (gauges + percentiles), Errors & Crashes (trends + impact), Resources & Network, Mobile Vitals (iOS/Android), User Analysis (browser/OS/version), Page Performance (CWV per page), Session Explorer (30 sessions with duration). Platform and page filters.
 
 ### CloudWatch Dashboard
 
