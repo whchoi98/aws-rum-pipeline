@@ -1,0 +1,11 @@
+- Terraform 변경 시: `cd terraform && terraform validate` 실행하여 검증한다.
+- Lambda 변경 시: 해당 함수 디렉토리에서 `python3 -m pytest test_handler.py -v` 실행한다.
+- Lambda 함수 목록: authorizer, ingest, transform, partition-repair, athena-query.
+- edge-auth (Node.js)는 별도 테스트 방식을 따른다.
+- Web SDK 변경 시: `cd sdk && npm test` 실행한다.
+- iOS SDK 변경 시: `cd mobile-sdk-ios && swift test` 실행한다.
+- Android SDK 변경 시: `cd mobile-sdk-android && ./gradlew :rum-sdk:test` 실행한다.
+- Simulator 변경 시: `cd simulator && npm test` 실행한다.
+- CDK 변경 시: `cd cdk && npx cdk synth` 실행하여 CloudFormation 생성을 검증한다.
+- 쉘 스크립트 변경 시: `bash -n <script>` 로 문법을 검증한다.
+- E2E 통합 테스트: `bash scripts/test-ingestion.sh "<api-endpoint>" "<api-key>"` 실행한다.

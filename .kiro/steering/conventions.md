@@ -1,0 +1,22 @@
+- 주석과 문서는 한국어 우선으로 작성한다.
+- 모든 AWS 리소스는 ap-northeast-2 (서울) 리전을 기본으로 한다.
+- 시크릿(API Key, 토큰 등)은 코드에 하드코딩하지 않고 AWS SSM Parameter Store를 사용한다.
+- Terraform 코드 변경 시 `terraform fmt -recursive`를 실행한다.
+- Terraform 리소스에는 반드시 `project`, `environment`, `managed_by = "terraform"` 태그를 포함한다.
+- Terraform 모듈 간 데이터 전달은 outputs → variable 방식으로만 한다.
+- `tfplan` 파일은 커밋하지 않는다 (`.gitignore` 포함).
+- Lambda 함수는 각각 독립 배포 가능하게 유지하고, 공유 레이어를 최소화한다.
+- Lambda 환경변수로 설정을 주입하고, IAM 최소 권한 원칙을 적용한다.
+- Lambda 에러는 CloudWatch Logs로 구조화 로깅한다 (JSON 형식).
+- Python Lambda의 boto3 호출은 테스트에서 mock 처리한다 (moto 또는 unittest.mock).
+- Python은 Black 포맷터를 사용하고 type hints를 권장한다.
+- TypeScript는 strict 모드를 유지하고, vitest로 테스트한다.
+- Web/iOS/Android SDK 간 이벤트 스키마를 동일하게 유지한다.
+- CDK Construct는 Terraform 모듈과 1:1 대응을 유지한다.
+- CDK에서 Lambda 소스는 `../lambda/` 디렉터리를 그대로 참조한다.
+- 환경 분리는 `dev` / `prod` workspace 또는 tfvars로 관리한다.
+- 모노레포 구조: 각 패키지는 독립적으로 관리한다 (node_modules, requirements.txt 분리).
+- ADR은 `docs/decisions/ADR-NNN-title.md` 형식으로 순번을 자동 증가시킨다.
+- 새 Terraform 모듈이나 Lambda 함수 추가 시 해당 디렉토리에 문서를 작성한다.
+- 아키텍처 변경 시 `docs/architecture.md`를 업데이트한다.
+- 운영 절차 정의 시 `docs/runbooks/NN-title.md`를 작성한다.

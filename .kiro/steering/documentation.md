@@ -1,0 +1,9 @@
+- 아키텍처 결정 시 `docs/decisions/ADR-NNN-title.md`를 작성한다.
+- ADR 번호는 `find docs/decisions -name 'ADR-*.md' | sort | tail -1`로 최대값을 찾아 +1 한다.
+- 새 모듈/함수 추가 시 해당 디렉토리에 모듈 문서를 작성한다.
+- 인프라 변경 시 `docs/architecture.md`를 업데이트한다.
+- 운영 절차 정의 시 `docs/runbooks/NN-title.md`를 작성한다.
+- `terraform/modules/` 하위에 새 디렉토리 생성 시 해당 모듈 문서를 함께 작성한다.
+- 새 Lambda 함수 추가 시 `lambda/` 모듈 문서를 업데이트한다.
+- API 엔드포인트 추가/변경 시 api-gateway 모듈 문서를 업데이트한다.
+- 문서 동기화 시 각 모듈 문서의 품질을 평가한다 (명령어, 아키텍처, 패턴, 간결성, 최신성, 실행 가능성).
