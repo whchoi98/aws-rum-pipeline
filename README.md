@@ -1,319 +1,265 @@
 # AWS Custom RUM Pipeline
 
-> AWS Serverless Real User Monitoring Pipeline
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.5-623CE4.svg)](https://www.terraform.io/)
+[![CDK](https://img.shields.io/badge/AWS_CDK-TypeScript-FF9900.svg)](https://aws.amazon.com/cdk/)
 
-<p align="center">
-  <a href="#-한국어"><kbd>🇰🇷 한국어</kbd></a>&nbsp;&nbsp;&nbsp;
-  <a href="#-english"><kbd>🇺🇸 English</kbd></a>
-</p>
+A serverless Real User Monitoring pipeline built on AWS — collect, store, query, and visualize RUM data at scale.
+
+AWS 서버리스 기반 Real User Monitoring 파이프라인 — RUM 데이터를 대규모로 수집, 저장, 쿼리, 시각화합니다.
+
+🇺🇸 [English](#english) | 🇰🇷 [한국어](#한국어)
+
+---
+
+# English
+
+## Overview
+
+AWS Custom RUM Pipeline is a serverless Real User Monitoring solution that replaces expensive commercial RUM services. It collects user behavior, performance, and error data from Web, iOS, and Android applications through a unified ingestion pipeline, stores events as Parquet files in S3, and provides analysis through Athena + Grafana dashboards and a Bedrock AgentCore AI agent.
+
+The pipeline processes approximately 1.8M events/day for 50K DAU at an estimated cost of ~$124/month.
+
+## Features
+
+- **Core Web Vitals Monitoring** — Real-time collection and rating analysis of LCP, CLS, and INP metrics.
+- **Multi-Platform Support** — Web (TypeScript), iOS (Swift), and Android (Kotlin) SDKs unified into a single pipeline.
+- **Error and Crash Tracking** — JS errors, unhandled exceptions, crashes, and ANR with automatic stack trace collection.
+- **AI-Powered Analysis** — Natural language RUM data analysis via Bedrock Claude Sonnet with auto-generated Athena SQL.
+- **Admin Dashboard** — 43-panel Grafana dashboard across 9 sections with real-time KPIs, CWV gauges, error trends, and session explorer.
+- **Infrastructure as Code** — Dual IaC support with Terraform (11 modules) and AWS CDK (11 constructs).
+- **SSO Authentication** — CloudFront + Lambda@Edge + Cognito SSO for Agent UI access control with per-user memory.
+
+## Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| AWS CLI | v2+ | AWS resource management |
+| Terraform | >= 1.5 | Infrastructure deployment |
+| Node.js | >= 18 | Web SDK, Simulator, CDK |
+| Python | >= 3.9 | Lambda functions, tests |
+| Docker | latest | Simulator/Agent image builds |
+| kubectl | latest | EKS CronJob deployment (optional) |
+| Xcode | 15+ | iOS SDK build (optional) |
+| Android Studio | latest | Android SDK build (optional) |
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/whchoi98/aws-rum-pipeline.git
+cd aws-rum-pipeline
+
+# One-click full installation
+./scripts/setup.sh all
+
+# Or step-by-step
+./scripts/setup.sh infra       # 1. Terraform infrastructure
+./scripts/setup.sh sdk         # 2. Web SDK build + test
+./scripts/setup.sh simulator   # 3. Simulator local test
+./scripts/setup.sh grafana     # 4. Grafana dashboard provisioning
+./scripts/setup.sh eks         # 5. EKS CronJob deployment (optional)
+./scripts/setup.sh test        # 6. Full test suite
+```
+
+## Usage
+
+### Web SDK
+
+```typescript
+import { RumSDK } from '@myorg/rum-sdk';
+
+RumSDK.init({
+  endpoint: 'https://<api-id>.execute-api.ap-northeast-2.amazonaws.com',
+  apiKey: 'your-api-key',
+  appVersion: '1.0.0',
+  sampleRate: 1.0,        // 0~1 (default 1.0 = 100%)
+  flushInterval: 30000,   // batch interval (ms)
+  maxBatchSize: 10,       // batch size
+});
+
+RumSDK.setUser('user-123');
+RumSDK.addCustomEvent('purchase', { productId: 'ABC', amount: 29900 });
+// Auto-collects: LCP, CLS, INP, JS errors, page views, XHR/Fetch performance
+```
+
+### iOS SDK (Swift)
+
+```swift
+import RumSDK
+
+RumSDK.shared.configure(RumConfig(
+    endpoint: "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com",
+    apiKey: "your-api-key",
+    appVersion: "2.1.0"
+))
+RumSDK.shared.setUser(userId: "user-123")
+// Auto-collects: crashes, screen transitions, app start time, tap actions
+```
+
+### Android SDK (Kotlin)
+
+```kotlin
+import com.myorg.rum.RumSDK
+import com.myorg.rum.Config
+
+RumSDK.init(context, Config(
+    endpoint = "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com",
+    apiKey = "your-api-key",
+    appVersion = "2.1.0"
+))
+RumSDK.setUser("user-123")
+// Auto-collects: crashes, ANR, screen transitions, app start time, tap actions
+```
+
+## Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `aws_region` | AWS deployment region | `ap-northeast-2` |
+| `environment` | Environment name (dev/staging/prod) | `dev` |
+| `project_name` | Resource naming prefix | `rum-pipeline` |
+| `vpc_id` | VPC ID for Agent UI | (required) |
+| `public_subnet_ids` | Public subnets for ALB | (required) |
+| `agentcore_endpoint_arn` | Bedrock AgentCore ARN | (required) |
+| `sso_metadata_url` | SSO SAML metadata URL | `""` (disabled) |
+| `allowed_origins` | CORS allowed origins | `["*"]` |
+
+Set values in `terraform/terraform.tfvars` (see `terraform.tfvars.example`).
+
+## Project Structure
+
+```
+aws-rum-pipeline/
+├── terraform/                    # IaC — Terraform root + 11 modules
+│   └── modules/
+│       ├── s3-data-lake/         # S3 buckets + lifecycle policies
+│       ├── glue-catalog/         # Glue DB + 3 table definitions
+│       ├── firehose/             # Kinesis Firehose + Transform Lambda
+│       ├── api-gateway/          # HTTP API + Ingest Lambda
+│       ├── security/             # WAF WebACL + SSM API Key
+│       ├── monitoring/           # CloudWatch Dashboard (22 widgets)
+│       ├── grafana/              # Managed Grafana + Athena Workgroup
+│       ├── partition-repair/     # Glue partition auto-repair (EventBridge)
+│       ├── athena-query/         # Athena SQL execution Lambda
+│       ├── agent-ui/             # CloudFront + ALB + EC2
+│       └── auth/                 # Cognito SSO + Lambda@Edge
+├── lambda/                       # Lambda functions (Python 3.12)
+│   ├── authorizer/               # API Key validation (SSM cached)
+│   ├── ingest/                   # HTTP → Firehose forwarding
+│   ├── transform/                # Schema validation + PII strip + partitioning
+│   ├── partition-repair/         # MSCK REPAIR TABLE
+│   ├── athena-query/             # Athena SQL execution (AgentCore)
+│   └── edge-auth/                # CloudFront Lambda@Edge JWT (Node.js)
+├── sdk/                          # Web RUM SDK (TypeScript, 12KB)
+├── mobile-sdk-ios/               # iOS RUM SDK (Swift 5.9, SPM)
+├── mobile-sdk-android/           # Android RUM SDK (Kotlin 1.9, Gradle)
+├── simulator/                    # Traffic generator (TypeScript, Docker, EKS)
+├── agentcore/                    # Bedrock AgentCore AI agent + Next.js UI
+├── cdk/                          # AWS CDK (TypeScript) — Terraform alternative
+├── scripts/                      # Build/deploy/test scripts
+└── docs/                         # Architecture, ADRs, runbooks
+```
+
+## Testing
+
+```bash
+# Lambda unit tests (Python)
+cd lambda/authorizer && python3 -m pytest test_handler.py -v   # 8 tests
+cd lambda/ingest && python3 -m pytest test_handler.py -v       # 7 tests
+cd lambda/transform && python3 -m pytest test_handler.py -v    # 8 tests
+
+# Web SDK unit tests (TypeScript)
+cd sdk && npx vitest run                                       # 14 tests
+
+# Simulator tests
+cd simulator && npx vitest run                                 # 3 tests
+
+# iOS SDK tests
+cd mobile-sdk-ios && swift test                                # 11 tests
+
+# Android SDK tests
+cd mobile-sdk-android && ./gradlew :rum-sdk:test               # 8 tests
+
+# E2E integration test
+./scripts/test-ingestion.sh <api-endpoint> <api-key>
+```
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Commit changes: `git commit -m "feat: add new feature"`
+4. Push to your fork: `git push origin feat/my-feature`
+5. Open a Pull Request.
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Contact
+
+- **Maintainer:** [whchoi98](https://github.com/whchoi98)
+- **Issues:** [GitHub Issues](https://github.com/whchoi98/aws-rum-pipeline/issues)
+- **Repository:** [github.com/whchoi98/aws-rum-pipeline](https://github.com/whchoi98/aws-rum-pipeline)
 
 ---
 
-# 🇰🇷 한국어
-
-## 목차
-
-| 섹션 | 설명 |
-|:-----|:-----|
-| [개요](#개요) | 프로젝트 소개 및 목표 |
-| [아키텍처](#아키텍처) | 전체 시스템 구성도 |
-| [비용 비교](#비용-비교) | AWS 서비스별 월 비용 |
-| [사전 조건](#사전-조건) | 설치 요구사항 |
-| [빠른 시작](#빠른-시작) | 설치 및 실행 |
-| [프로젝트 구조](#프로젝트-구조) | 디렉토리 레이아웃 |
-| [인프라 모듈](#인프라-모듈-terraform) | Terraform 11개 모듈 상세 |
-| [Lambda 함수](#lambda-함수) | 6개 Lambda 역할 |
-| [Web SDK](#web-sdk-typescript) | 브라우저 RUM 수집 |
-| [Mobile SDK](#mobile-sdk) | iOS (Swift) + Android (Kotlin) |
-| [시뮬레이터](#시뮬레이터) | 테스트 트래픽 생성 |
-| [대시보드](#대시보드) | Grafana (43패널) + CloudWatch |
-| [AI 분석 에이전트](#ai-분석-에이전트) | Bedrock AgentCore |
-| [배포 리소스](#배포된-리소스) | 엔드포인트 및 식별자 |
-| [테스트](#테스트) | 단위/통합 테스트 실행 |
-| [운영](#운영) | 파티션, CronJob, 사용자 관리 |
-
----
+# 한국어
 
 ## 개요
 
-AWS 서버리스 서비스 기반의 경제적인 Real User Monitoring 파이프라인입니다.
+AWS Custom RUM Pipeline은 비용이 높은 상용 RUM 서비스를 대체하는 서버리스 Real User Monitoring 솔루션입니다. Web, iOS, Android 앱에서 사용자 행동, 성능, 에러 데이터를 통합 수집 파이프라인으로 수집하고, S3에 Parquet 파일로 저장하며, Athena + Grafana 대시보드와 Bedrock AgentCore AI 에이전트를 통해 분석합니다.
 
-Web(React/Next.js), iOS(Swift), Android(Kotlin) 앱에서 사용자 행동, 성능, 에러 데이터를 수집하여 S3 Data Lake에 저장하고, Athena + Grafana로 시각화합니다. Bedrock AgentCore 기반 AI 에이전트로 자연어 데이터 분석도 지원합니다.
+DAU 5만 기준 약 180만 이벤트/일을 처리하며, 예상 비용은 월 ~$124입니다.
 
-### 주요 기능
+## 주요 기능
 
 - **Core Web Vitals 모니터링** — LCP, CLS, INP 실시간 수집 및 등급 분석
-- **모바일 바이탈** — 앱 시작 시간, 화면 로딩, 프레임 드랍, ANR/크래시 감지
-- **에러 추적** — JS 에러, 미처리 예외, 크래시, ANR 자동 수집 및 스택 트레이스
-- **사용자 세션 분석** — 세션별 활동 추적, 페이지/화면 전환, 이탈 분석
-- **리소스 모니터링** — XHR/Fetch 요청 성능, 응답 시간, 에러율
-- **다중 플랫폼** — Web, iOS, Android 단일 파이프라인 통합
-- **AI 분석** — 자연어 질문으로 RUM 데이터 자동 분석 (Bedrock Claude Sonnet)
+- **다중 플랫폼 지원** — Web(TypeScript), iOS(Swift), Android(Kotlin) SDK를 단일 파이프라인으로 통합
+- **에러 및 크래시 추적** — JS 에러, 미처리 예외, 크래시, ANR 자동 수집 및 스택 트레이스
+- **AI 기반 분석** — Bedrock Claude Sonnet으로 자연어 RUM 데이터 분석, Athena SQL 자동 생성
+- **관리자 대시보드** — 43개 패널 9개 섹션의 Grafana 대시보드 (실시간 KPI, CWV 게이지, 에러 추이, 세션 탐색기)
+- **Infrastructure as Code** — Terraform(11개 모듈)과 AWS CDK(11개 Construct) 듀얼 IaC 지원
+- **SSO 인증** — CloudFront + Lambda@Edge + Cognito SSO로 Agent UI 접근 제어 및 사용자별 메모리
 
----
-
-## 아키텍처
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         데이터 수집 (SDK)                            │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────────────┐ │
-│  │ Web SDK  │   │ iOS SDK  │   │ Android  │   │ Simulator        │ │
-│  │ (TS/npm) │   │ (Swift)  │   │ (Kotlin) │   │ (EKS CronJob)   │ │
-│  └────┬─────┘   └────┬─────┘   └────┬─────┘   └────────┬────────┘ │
-│       └───────────────┴──────────────┴──────────────────┘          │
-│                              │ HTTPS + x-api-key                    │
-└──────────────────────────────┼──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         보안 계층                                    │
-│  WAF WebACL (Rate Limit + Bot Control)                              │
-│  HTTP API Gateway → Lambda Authorizer (SSM API Key 검증, 300초 캐싱) │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         수집 + 변환                                  │
-│  Ingest Lambda → Kinesis Data Firehose → Transform Lambda           │
-│                  (5MB/60초 버퍼)         (스키마 검증, PII 제거,       │
-│                                          동적 파티셔닝)              │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         저장소 (S3 Data Lake)                        │
-│  s3://rum-pipeline-data-lake-{account}/                             │
-│  └── raw/platform={web|ios|android}/year=/month=/day=/hour=/        │
-│      └── events-*.parquet (Snappy 압축)                             │
-│                                                                     │
-│  Glue Data Catalog: rum_pipeline_db.rum_events                      │
-│  파티션 자동 등록: EventBridge (15분) → Partition Repair Lambda       │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         분석 + 시각화                                │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌───────────────────┐  │
-│  │ Amazon Managed   │  │ CloudWatch       │  │ Bedrock AgentCore │  │
-│  │ Grafana          │  │ Dashboard        │  │ (AI 분석 에이전트) │  │
-│  │ - Athena Plugin  │  │ - 22개 위젯      │  │ - Claude Sonnet   │  │
-│  │ - RUM 대시보드    │  │ - 한글 라벨      │  │ - 자연어 SQL 생성 │  │
-│  │ - 6개 섹션       │  │ - 8개 Row        │  │ - 자동 실행+분석  │  │
-│  └─────────────────┘  └──────────────────┘  └───────────────────┘  │
-│           ▲                    ▲                      ▲             │
-│     Athena Workgroup    API Gateway Metrics    Athena Query Lambda  │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 비용 비교
-
-### AWS Custom RUM Pipeline
-
-| 서비스 | 월 비용 (DAU 5만 기준) |
-|--------|----------------------|
-| API Gateway (HTTP API) | ~$15 |
-| Kinesis Data Firehose | ~$30 |
-| Lambda (5개 함수) | ~$25 |
-| S3 Storage (45GB/90일) | ~$25 |
-| WAF (Rate + Bot Control) | ~$19 |
-| Amazon Managed Grafana | ~$9 |
-| Athena Queries | ~$1 |
-| **합계** | **~$124/월** |
-
----
-
-## 사전 조건
+## 사전 요구 사항
 
 | 도구 | 버전 | 용도 |
 |------|------|------|
 | AWS CLI | v2+ | AWS 리소스 관리 |
 | Terraform | >= 1.5 | 인프라 배포 |
-| Node.js | >= 18 | Web SDK, Simulator |
+| Node.js | >= 18 | Web SDK, Simulator, CDK |
 | Python | >= 3.9 | Lambda 함수, 테스트 |
 | Docker | latest | Simulator/Agent 이미지 빌드 |
 | kubectl | latest | EKS CronJob 배포 (선택) |
 | Xcode | 15+ | iOS SDK 빌드 (선택) |
 | Android Studio | latest | Android SDK 빌드 (선택) |
 
----
-
-## 빠른 시작
-
-### 전체 설치 (원클릭)
+## 설치 방법
 
 ```bash
-git clone <repo-url>
-cd rum
+# 리포지토리 클론
+git clone https://github.com/whchoi98/aws-rum-pipeline.git
+cd aws-rum-pipeline
+
+# 원클릭 전체 설치
 ./scripts/setup.sh all
+
+# 또는 단계별 설치
+./scripts/setup.sh infra       # 1. Terraform 인프라 배포
+./scripts/setup.sh sdk         # 2. Web SDK 빌드 + 테스트
+./scripts/setup.sh simulator   # 3. 시뮬레이터 로컬 테스트
+./scripts/setup.sh grafana     # 4. Grafana 대시보드 프로비저닝
+./scripts/setup.sh eks         # 5. EKS CronJob 배포 (선택)
+./scripts/setup.sh test        # 6. 전체 테스트 실행
 ```
 
-### 단계별 설치
+## 사용법
 
-```bash
-# 1. Terraform 인프라 배포
-./scripts/setup.sh infra
-
-# 2. Web SDK 빌드 + 테스트
-./scripts/setup.sh sdk
-
-# 3. 시뮬레이터 로컬 테스트
-./scripts/setup.sh simulator
-
-# 4. Grafana 대시보드 프로비저닝
-./scripts/setup.sh grafana
-
-# 5. EKS CronJob 배포 (선택)
-./scripts/setup.sh eks
-
-# 6. 전체 테스트 실행
-./scripts/setup.sh test
-```
-
----
-
-## 프로젝트 구조
-
-```
-rum/
-├── terraform/                        # IaC — Terraform 루트 + 11개 모듈
-│   ├── main.tf                       # 루트 모듈 (모든 모듈 연결)
-│   ├── variables.tf                  # 입력 변수 (region, project_name 등)
-│   ├── outputs.tf                    # 출력값 (endpoints, ARNs)
-│   └── modules/
-│       ├── s3-data-lake/             # S3 버킷 + 라이프사이클 정책
-│       ├── glue-catalog/             # Glue DB + 3개 테이블 정의
-│       ├── firehose/                 # Kinesis Firehose + Transform Lambda
-│       ├── api-gateway/              # HTTP API + Ingest Lambda + Authorizer
-│       ├── security/                 # WAF WebACL + SSM API Key
-│       ├── monitoring/               # CloudWatch Dashboard (22개 위젯)
-│       ├── grafana/                  # Managed Grafana + Athena Workgroup
-│       ├── partition-repair/         # Glue 파티션 자동 등록 (EventBridge)
-│       ├── athena-query/             # Athena SQL 실행 Lambda
-│       ├── agent-ui/                 # CloudFront + ALB + EC2 인프라
-│       └── auth/                     # Cognito SSO + Lambda@Edge 인증
-│
-├── lambda/                           # Lambda 함수 (Python 3.12)
-│   ├── authorizer/                   # API Key 검증 (SSM 캐싱)
-│   ├── ingest/                       # HTTP → Firehose 포워딩
-│   ├── transform/                    # 스키마 검증 + PII 제거 + 파티셔닝
-│   ├── partition-repair/             # MSCK REPAIR TABLE 자동 실행
-│   ├── athena-query/                 # Athena SQL 쿼리 실행 (AgentCore용)
-│   └── edge-auth/                    # CloudFront Lambda@Edge JWT 검증 (Node.js)
-│
-├── sdk/                              # Web RUM SDK (TypeScript)
-│   ├── src/                          # buffer, transport, collectors
-│   │   ├── index.ts                  # RumSDK 진입점
-│   │   ├── collectors/               # web-vitals, error, navigation, resource
-│   │   └── utils/                    # id 생성, 브라우저 컨텍스트
-│   ├── tests/                        # vitest 단위 테스트 (14개)
-│   └── dist/                         # 빌드 출력 (ESM, CJS, IIFE 12KB)
-│
-├── mobile-sdk-ios/                   # iOS RUM SDK (Swift 5.9, SPM)
-│   ├── Sources/RumSDK/               # SDK 소스
-│   │   ├── RumSDK.swift              # 싱글톤 진입점
-│   │   ├── Collectors/               # Crash, Screen, Performance, Action
-│   │   └── Models/                   # RumEvent (Codable)
-│   ├── Tests/RumSDKTests/            # XCTest (11개)
-│   └── Package.swift                 # SPM 패키지 정의
-│
-├── mobile-sdk-android/               # Android RUM SDK (Kotlin 1.9, Gradle)
-│   ├── rum-sdk/src/main/kotlin/      # SDK 소스
-│   │   └── com/myorg/rum/
-│   │       ├── RumSDK.kt             # 싱글톤 진입점
-│   │       ├── collectors/           # Crash, ANR, Screen, Performance, Action
-│   │       └── models/               # RumEvent (data class)
-│   ├── rum-sdk/src/test/kotlin/      # JUnit 테스트 (8개)
-│   └── build.gradle.kts              # Gradle 빌드 설정
-│
-├── simulator/                        # 테스트 트래픽 생성기 (TypeScript)
-│   ├── src/                          # 이벤트 생성기 (Web 60%, iOS 25%, Android 15%)
-│   ├── k8s/                          # EKS CronJob (5분 간격)
-│   ├── Dockerfile                    # node:20-alpine 컨테이너
-│   └── tests/                        # vitest 테스트 (3개)
-│
-├── agentcore/                        # Bedrock AgentCore AI 분석 에이전트
-│   ├── agent.py                      # Strands Agent (Claude + Athena MCP)
-│   ├── web-app/                      # Next.js 14 채팅 UI
-│   │   └── app/api/chat/route.ts     # SSE 스트리밍 API (3라운드 SQL 루프)
-│   ├── Dockerfile                    # Python 3.11 arm64 컨테이너
-│   └── streamable_http_sigv4.py      # MCP Gateway SigV4 signing
-│
-├── cdk/                              # AWS CDK (TypeScript) — Terraform 대안
-│   ├── lib/rum-pipeline-stack.ts     # 메인 스택 (10개 Construct 조합)
-│   ├── lib/constructs/               # 10개 Construct (TF 모듈 1:1 대응)
-│   │   └── helpers.ts                # Lambda/IAM/Glue 공유 헬퍼
-│   └── bin/app.ts                    # CDK 앱 엔트리포인트
-│
-├── scripts/                          # 운영 스크립트
-│   ├── setup.sh                      # 통합 설치 (6개 Phase)
-│   ├── setup-agentcore.sh            # AgentCore 전체 셋업
-│   ├── test-ingestion.sh             # E2E 통합 테스트
-│   ├── deploy-unified-dashboard.py   # Grafana 대시보드 배포
-│   └── provision-grafana.sh          # Grafana 데이터소스 설정
-│
-├── docs/                             # 문서
-│   ├── architecture.md               # 아키텍처 문서
-│   ├── decisions/                    # ADR (Architecture Decision Records)
-│   ├── runbooks/                     # 운영 런북
-│   └── superpowers/
-│       ├── specs/                    # 설계 스펙 (4개)
-│       └── plans/                    # 구현 계획 (4개)
-│
-├── CLAUDE.md                         # Claude Code 프로젝트 컨텍스트
-└── README.md                         # 이 문서
-```
-
----
-
-## 인프라 모듈 (Terraform)
-
-10개 Terraform 모듈의 의존성 체인:
-
-```
-s3-data-lake ──→ glue-catalog ──→ firehose ──→ security ──→ api-gateway
-                                                  │              │
-                                                  ▼              ▼
-                                              monitoring    partition-repair
-                                                  │
-                                                  ▼
-                                               grafana ──→ athena-query ──→ agent-ui
-```
-
-| 모듈 | 역할 | 주요 리소스 |
-|------|------|-----------|
-| `s3-data-lake` | 데이터 저장소 | S3 버킷, 라이프사이클 (raw 90일, aggregated 1년) |
-| `glue-catalog` | 메타데이터 | Glue DB, rum_events/hourly_metrics/daily_summary 테이블 |
-| `firehose` | 스트림 처리 | Kinesis Firehose, Transform Lambda, Parquet 변환 |
-| `api-gateway` | API 진입점 | HTTP API, Ingest Lambda, Authorizer, WAF Association |
-| `security` | 인증/보안 | WAF WebACL (Rate+Bot), SSM API Key, Authorizer Lambda |
-| `monitoring` | 운영 모니터링 | CloudWatch Dashboard (22개 위젯, 8개 Row) |
-| `grafana` | 시각화 | Managed Grafana, Athena Workgroup, IAM Role |
-| `partition-repair` | 파티션 관리 | EventBridge (15분) → Lambda → MSCK REPAIR TABLE |
-| `athena-query` | AI 에이전트용 | Athena SQL 실행 Lambda (AgentCore Gateway Target) |
-| `agent-ui` | AI UI 호스팅 | CloudFront → ALB → EC2 (Next.js) |
-
----
-
-## Lambda 함수
-
-| 함수 | 런타임 | 메모리 | 타임아웃 | 역할 |
-|------|--------|--------|---------|------|
-| `rum-pipeline-authorizer` | Python 3.12 | 128MB | 10초 | x-api-key 검증, SSM 캐싱 (300초) |
-| `rum-pipeline-ingest` | Python 3.12 | 128MB | 30초 | HTTP 요청 → Firehose PutRecordBatch |
-| `rum-pipeline-transform` | Python 3.12 | 256MB | 60초 | 스키마 검증, PII 제거, 동적 파티셔닝 |
-| `rum-pipeline-partition-repair` | Python 3.12 | 128MB | 120초 | MSCK REPAIR TABLE (15분 주기) |
-| `rum-pipeline-athena-query` | Python 3.12 | 256MB | 60초 | Athena SQL 실행 (SELECT만 허용) |
-
----
-
-## Web SDK (TypeScript)
-
-### 설치
-
-```bash
-npm install @myorg/rum-sdk
-```
-
-### 사용법
+### Web SDK
 
 ```typescript
 import { RumSDK } from '@myorg/rum-sdk';
@@ -327,570 +273,129 @@ RumSDK.init({
   maxBatchSize: 10,       // 배치 크기
 });
 
-// 사용자 식별
 RumSDK.setUser('user-123');
-
-// 커스텀 이벤트
 RumSDK.addCustomEvent('purchase', { productId: 'ABC', amount: 29900 });
+// 자동 수집: LCP, CLS, INP, JS 에러, 페이지뷰, XHR/Fetch 성능
 ```
 
-### 자동 수집 항목
-
-| Collector | 수집 항목 | event_type |
-|-----------|----------|------------|
-| WebVitalsCollector | LCP, CLS, INP | performance |
-| ErrorCollector | window.onerror, unhandledrejection | error |
-| NavigationCollector | 페이지뷰, SPA 라우트 변경 | navigation |
-| ResourceCollector | XHR/Fetch 요청 성능 | resource |
-
-### 빌드
-
-```bash
-cd sdk
-npm install && npm run build
-
-# 출력
-# dist/index.mjs  (ESM, tree-shakeable)
-# dist/index.cjs  (CommonJS)
-# dist/rum-sdk.min.js  (IIFE, 12KB, CDN용)
-```
-
----
-
-## Mobile SDK
-
-### iOS (Swift)
-
-**요구사항:** iOS 15+, Swift 5.9+, Xcode 15+
-
-```swift
-// Package.swift에 의존성 추가
-dependencies: [
-    .package(url: "https://github.com/myorg/rum-sdk-ios.git", from: "0.1.0")
-]
-```
+### iOS SDK (Swift)
 
 ```swift
 import RumSDK
 
-// AppDelegate 또는 @main에서 초기화
 RumSDK.shared.configure(RumConfig(
     endpoint: "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com",
     apiKey: "your-api-key",
     appVersion: "2.1.0"
 ))
-
-// 사용자 식별
 RumSDK.shared.setUser(userId: "user-123")
+// 자동 수집: 크래시, 화면 전환, 앱 시작 시간, 탭 액션
 ```
 
-**자동 수집:** 크래시 (NSException + signal), 화면 전환 (VC swizzling), 앱 시작 시간, 탭 액션
-
-### Android (Kotlin)
-
-**요구사항:** minSdk 26, Kotlin 1.9+
-
-```kotlin
-// build.gradle.kts
-dependencies {
-    implementation("com.myorg:rum-sdk:0.1.0")
-}
-```
-
-```kotlin
-import com.myorg.rum.RumSDK
-import com.myorg.rum.Config
-
-// Application.onCreate()에서 초기화
-RumSDK.init(this, Config(
-    endpoint = "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com",
-    apiKey = "your-api-key",
-    appVersion = "2.1.0"
-))
-
-// 사용자 식별
-RumSDK.setUser("user-123")
-```
-
-**자동 수집:** 크래시 (UncaughtExceptionHandler), ANR (5초 워치독), 화면 전환 (ActivityLifecycleCallbacks), 앱 시작 시간, 탭 액션
-
----
-
-## 시뮬레이터
-
-Web/iOS/Android 트래픽을 시뮬레이션하여 파이프라인을 검증합니다.
-
-### 플랫폼 분포
-
-| 플랫폼 | 비율 | 주요 이벤트 |
-|--------|------|------------|
-| Web | 60% | lcp, cls, inp, page_view, js_error, click |
-| iOS | 25% | app_start, screen_load, crash, oom, tap |
-| Android | 15% | app_start, frame_drop, crash, anr, tap |
-
-### 시나리오
-
-| 시나리오 | 확률 | LCP 배수 | 에러율 |
-|----------|------|----------|--------|
-| normal | 70% | 1.0x | 5% |
-| slowPage | 20% | 3.0x | 8% |
-| errorSpike | 10% | 1.2x | 80% |
-
-### 로컬 실행
-
-```bash
-cd simulator
-npm install
-
-RUM_API_ENDPOINT=https://<api-id>.execute-api.ap-northeast-2.amazonaws.com \
-RUM_API_KEY=$(aws ssm get-parameter --name /rum-pipeline/dev/api-keys \
-  --with-decryption --query Parameter.Value --output text --region ap-northeast-2) \
-EVENTS_PER_BATCH=50 \
-CONCURRENT_SESSIONS=5 \
-npx tsx src/index.ts
-```
-
-### EKS CronJob
-
-```bash
-# EKS 클러스터 설정
-aws eks update-kubeconfig --name <your-cluster-name> --region ap-northeast-2
-
-# 배포
-kubectl create namespace rum
-kubectl create secret generic rum-api-key --from-literal=api-key="<key>" -n rum
-kubectl apply -f simulator/k8s/cronjob.yaml
-
-# 확인
-kubectl get cronjob -n rum
-```
-
----
-
-## 대시보드
-
-### Grafana (관리자 대시보드 — 43패널, 9섹션)
-
-**URL:** https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com/d/rum-unified-v2
-
-| 섹션 | 패널 수 | 주요 지표 |
-|------|---------|----------|
-| 📊 핵심 KPI | 8 | 세션/DAU/뷰/액션/에러/에러율/크래시/리소스 |
-| 📈 트래픽 추이 | 2 | 시간별 이벤트 유형 스택, 세션/사용자 추이 |
-| ⚡ Core Web Vitals | 4 | LCP/CLS/INP 게이지, 등급분포, 백분위수 |
-| 🔴 에러 & 크래시 | 4 | 시간별 추이, 유형 파이, 영향 범위, 상세 목록 |
-| 🌐 리소스 & 네트워크 | 3 | 유형 분포, 실패 리소스, 느린 리소스 |
-| 📱 모바일 바이탈 | 6 | iOS/Android 세션, 크래시, 화면별, OS 버전 |
-| 👥 사용자 분석 | 4 | 플랫폼/브라우저/OS/앱 버전 |
-| 📄 페이지별 성능 | 1 | CWV p75 + 에러율 (상위 20페이지) |
-| 🔍 세션 탐색기 | 1 | 최근 30세션 상세 (이벤트/에러/뷰/체류시간) |
-
-**필터:** 플랫폼 (전체/Web/iOS/Android), 페이지/화면
-
-### CloudWatch Dashboard
-
-**URL:** CloudWatch Console → rum-pipeline-dashboard
-
-22개 위젯, 8개 Row: API 요청/에러/지연시간, Lambda 호출/에러/실행시간/동시실행/스로틀, WAF 허용/차단/Rate Limit/Bot Control, Firehose 수신/전송/바이트
-
----
-
-## AI 분석 에이전트
-
-**URL:** https://<distribution-id>.cloudfront.net
-
-Bedrock AgentCore 기반 AI 에이전트로 RUM 데이터를 자연어로 분석합니다.
-
-```
-관리자 질문 → Claude Sonnet이 SQL 생성 → Athena 자동 실행 → 결과 분석 → 한국어 답변
-```
-
-### 기능
-
-- 최대 3라운드 자동 SQL 실행 루프
-- SSE 스트리밍 실시간 응답
-- react-markdown + remark-gfm 마크다운 렌더링
-- 6개 빠른 질문 버튼
-
-### 인프라
-
-| 구성 | 값 |
-|------|-----|
-| CloudFront | <distribution-id>.cloudfront.net |
-| ALB SG | CloudFront Prefix List only |
-| EC2 | t4g.large (mgmt-vpc) |
-| 모델 | global.anthropic.claude-sonnet-4-6 |
-| Runtime | `<agentcore-runtime-id>` |
-| Gateway | `<agentcore-gateway-id>` |
-| Memory | `<agentcore-memory-id>` |
-
----
-
-## 배포된 리소스
-
-| 리소스 | 값 |
-|--------|-----|
-| API Endpoint | `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com` |
-| Grafana | `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com` |
-| Agent UI | `https://<distribution-id>.cloudfront.net` |
-| SSO Portal | `https://<directory-id>.awsapps.com/start` |
-| S3 Data Lake | `rum-pipeline-data-lake-<account-id>` |
-| Glue Database | `rum_pipeline_db` |
-| Athena Workgroup | `rum-pipeline-athena` |
-| CW Dashboard | `rum-pipeline-dashboard` |
-| Region | `ap-northeast-2` |
-
----
-
-## 테스트
-
-```bash
-# Lambda 단위 테스트 (Python)
-cd lambda/authorizer && python3 -m pytest test_handler.py -v   # 8 tests
-cd lambda/ingest && python3 -m pytest test_handler.py -v       # 7 tests
-cd lambda/transform && python3 -m pytest test_handler.py -v    # 8 tests
-
-# Web SDK 단위 테스트 (TypeScript)
-cd sdk && npx vitest run                                       # 14 tests
-
-# 시뮬레이터 테스트
-cd simulator && npx vitest run                                 # 3 tests
-
-# E2E 통합 테스트
-API_KEY=$(aws ssm get-parameter --name /rum-pipeline/dev/api-keys \
-  --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
-./scripts/test-ingestion.sh \
-  https://<api-id>.execute-api.ap-northeast-2.amazonaws.com "$API_KEY"
-```
-
----
-
-## 운영
-
-### Glue 파티션 자동 등록
-
-EventBridge가 15분마다 `rum-pipeline-partition-repair` Lambda를 실행하여 `MSCK REPAIR TABLE rum_events`를 수행합니다. 새로운 Firehose 파티션이 자동으로 Athena에서 조회 가능해집니다.
-
-### EKS 시뮬레이터 관리
-
-```bash
-# CronJob 상태 확인
-kubectl get cronjob -n rum
-
-# 수동 실행
-kubectl create job rum-sim-manual --from=cronjob/rum-simulator -n rum
-
-# 로그 확인
-kubectl logs job/rum-sim-manual -n rum
-
-# 일시 중지
-kubectl patch cronjob rum-simulator -n rum -p '{"spec":{"suspend":true}}'
-```
-
-### Grafana 사용자 관리
-
-```bash
-# SSO 사용자 목록
-aws identitystore list-users --identity-store-id <directory-id> --region ap-northeast-2
-
-# Grafana Admin 추가
-USER_ID=$(aws identitystore list-users --identity-store-id <directory-id> \
-  --query 'Users[?UserName==`username`].UserId | [0]' --output text --region ap-northeast-2)
-aws grafana update-permissions --workspace-id <workspace-id> \
-  --update-instruction-batch "[{\"action\":\"ADD\",\"role\":\"ADMIN\",\"users\":[{\"id\":\"$USER_ID\",\"type\":\"SSO_USER\"}]}]" \
-  --region ap-northeast-2
-```
-
-### API Key 로테이션
-
-```bash
-# 현재 키 확인
-aws ssm get-parameter --name /rum-pipeline/dev/api-keys \
-  --with-decryption --query Parameter.Value --output text --region ap-northeast-2
-
-# 새 키 추가 (쉼표 구분)
-aws ssm put-parameter --name /rum-pipeline/dev/api-keys \
-  --value "기존키,새키" --type SecureString --overwrite --region ap-northeast-2
-```
-
----
-
-<p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
-
----
-
-# 🇺🇸 English
-
-## Table of Contents
-
-| Section | Description |
-|:--------|:-----------|
-| [Overview](#overview) | Project introduction and goals |
-| [Architecture](#architecture) | System architecture diagram |
-| [Cost Comparison](#cost-comparison) | AWS service costs breakdown |
-| [Prerequisites](#prerequisites) | Installation requirements |
-| [Quick Start](#quick-start) | Installation and execution |
-| [Project Structure](#project-structure-1) | Directory layout |
-| [Infrastructure](#infrastructure-modules-terraform) | 11 Terraform modules |
-| [Lambda Functions](#lambda-functions) | 6 Lambda roles |
-| [Web SDK](#web-sdk-typescript-1) | Browser RUM collection |
-| [Mobile SDKs](#mobile-sdks) | iOS (Swift) + Android (Kotlin) |
-| [Simulator](#simulator) | Test traffic generation |
-| [Dashboards](#dashboards) | Grafana (43 panels) + CloudWatch |
-| [AI Analysis Agent](#ai-analysis-agent) | Bedrock AgentCore |
-| [Deployed Resources](#deployed-resources) | Endpoints and identifiers |
-| [Testing](#testing) | Unit and integration tests |
-| [Operations](#operations) | Partitions, CronJob, user management |
-
----
-
-## Overview
-
-An economical Real User Monitoring pipeline built on AWS serverless services.
-
-It collects user behavior, performance, and error data from Web (React/Next.js), iOS (Swift), and Android (Kotlin) applications, stores them in an S3 Data Lake as Parquet files, and visualizes through Athena + Grafana. A Bedrock AgentCore AI agent enables natural language data analysis.
-
-### Key Features
-
-- **Core Web Vitals** — LCP, CLS, INP real-time collection and rating analysis
-- **Mobile Vitals** — App start time, screen load, frame drops, ANR/crash detection
-- **Error Tracking** — JS errors, unhandled exceptions, crashes, ANR with stack traces
-- **Session Analysis** — Per-session activity tracking, page/screen transitions
-- **Resource Monitoring** — XHR/Fetch request performance, response times, error rates
-- **Multi-Platform** — Web, iOS, Android unified into a single pipeline
-- **AI Analysis** — Natural language RUM data analysis (Bedrock Claude Sonnet)
-
----
-
-## Cost Comparison
-
-### AWS Custom RUM Pipeline
-
-| Service | Monthly Cost (50K DAU) |
-|---|---|
-| API Gateway (HTTP API) | ~$15 |
-| Kinesis Data Firehose | ~$30 |
-| Lambda (5 functions) | ~$25 |
-| S3 Storage (45GB/90days) | ~$25 |
-| WAF (Rate + Bot Control) | ~$19 |
-| Amazon Managed Grafana | ~$9 |
-| Athena Queries | ~$1 |
-| **Total** | **~$124/mo** |
-
----
-
-## Prerequisites
-
-- AWS CLI v2+, Terraform >= 1.5, Node.js >= 18, Python >= 3.9
-- Docker (for Simulator/Agent image builds)
-- kubectl (optional, for EKS CronJob)
-- Xcode 15+ (optional, for iOS SDK)
-- Android Studio (optional, for Android SDK)
-
----
-
-## Quick Start
-
-```bash
-# Full installation
-./scripts/setup.sh all
-
-# Step-by-step
-./scripts/setup.sh infra       # 1. Terraform infrastructure
-./scripts/setup.sh sdk         # 2. Web SDK build + test
-./scripts/setup.sh simulator   # 3. Simulator local test
-./scripts/setup.sh grafana     # 4. Grafana dashboard provisioning
-./scripts/setup.sh eks         # 5. EKS CronJob deployment
-./scripts/setup.sh test        # 6. Full test suite
-```
-
----
-
-## Architecture
-
-```
-SDK (Web/iOS/Android) → WAF → HTTP API → Lambda Authorizer → Ingest Lambda
-    → Kinesis Firehose → Transform Lambda → S3 Data Lake (Parquet)
-        → Athena → Grafana Dashboards
-        → Athena Query Lambda → Bedrock AgentCore (AI Analysis)
-    → CloudWatch Dashboard (Operations)
-```
-
----
-
-## Infrastructure Modules (Terraform)
-
-| Module | Purpose |
-|--------|---------|
-| `s3-data-lake` | S3 bucket with lifecycle policies |
-| `glue-catalog` | Glue database and table definitions |
-| `firehose` | Kinesis Firehose with Lambda transform |
-| `api-gateway` | HTTP API with Ingest Lambda and Authorizer |
-| `security` | WAF WebACL (Rate + Bot) and SSM API Key |
-| `monitoring` | CloudWatch Dashboard (22 widgets) |
-| `grafana` | Amazon Managed Grafana + Athena Workgroup |
-| `partition-repair` | Auto-register Glue partitions (15min) |
-| `athena-query` | Athena SQL execution Lambda for AgentCore |
-| `agent-ui` | CloudFront + ALB + EC2 for AI chat UI |
-| `auth` | Cognito SSO + Lambda@Edge JWT authentication |
-
-### Lambda Functions
-
-| Function | Trigger | Role |
-|----------|---------|------|
-| `authorizer` | API Gateway Lambda Authorizer | API Key validation (SSM cached) |
-| `ingest` | API Gateway HTTP Integration | HTTP → Firehose forwarding |
-| `transform` | Firehose Data Transformation | JSON normalize, PII strip, Parquet |
-| `partition-repair` | EventBridge (15min) | Glue MSCK REPAIR TABLE |
-| `athena-query` | Direct invoke (AgentCore) | Athena SQL execution |
-| `edge-auth` | CloudFront Lambda@Edge | Cognito JWT verification (Node.js) |
-
-### CDK (TypeScript Alternative)
-
-Same infrastructure as Terraform, written in TypeScript. 11 Constructs map 1:1 to Terraform modules.
-
-```bash
-cd cdk && npm install
-npx cdk synth     # Generate CloudFormation
-npx cdk deploy    # Deploy
-npx cdk diff      # Preview changes
-```
-
----
-
-## Web SDK (TypeScript)
-
-```typescript
-import { RumSDK } from '@myorg/rum-sdk';
-
-RumSDK.init({
-  endpoint: 'https://your-api.execute-api.region.amazonaws.com',
-  apiKey: 'your-api-key',
-  appVersion: '1.0.0',
-});
-```
-
-Auto-collects: Core Web Vitals (LCP/CLS/INP), JS errors, page views, SPA route changes, XHR/Fetch performance.
-
-Bundle size: **12KB** (IIFE, minified).
-
----
-
-## Mobile SDKs
-
-### iOS (Swift)
-
-```swift
-import RumSDK
-
-RumSDK.shared.configure(RumConfig(
-    endpoint: "https://your-api.execute-api.region.amazonaws.com",
-    apiKey: "your-api-key",
-    appVersion: "2.1.0"
-))
-```
-
-Auto-collects: Crashes, screen transitions, app start time, tap actions. Requires iOS 15+, Swift 5.9+.
-
-### Android (Kotlin)
+### Android SDK (Kotlin)
 
 ```kotlin
 import com.myorg.rum.RumSDK
 import com.myorg.rum.Config
 
 RumSDK.init(context, Config(
-    endpoint = "https://your-api.execute-api.region.amazonaws.com",
+    endpoint = "https://<api-id>.execute-api.ap-northeast-2.amazonaws.com",
     apiKey = "your-api-key",
     appVersion = "2.1.0"
 ))
+RumSDK.setUser("user-123")
+// 자동 수집: 크래시, ANR, 화면 전환, 앱 시작 시간, 탭 액션
 ```
 
-Auto-collects: Crashes, ANR (5s watchdog), screen transitions, app start time, tap actions. Requires minSdk 26, Kotlin 1.9+.
+## 환경 설정
 
----
+| 변수명 | 설명 | 기본값 |
+|--------|------|--------|
+| `aws_region` | AWS 배포 리전 | `ap-northeast-2` |
+| `environment` | 환경 이름 (dev/staging/prod) | `dev` |
+| `project_name` | 리소스 이름 접두사 | `rum-pipeline` |
+| `vpc_id` | Agent UI용 VPC ID | (필수) |
+| `public_subnet_ids` | ALB용 퍼블릭 서브넷 | (필수) |
+| `agentcore_endpoint_arn` | Bedrock AgentCore ARN | (필수) |
+| `sso_metadata_url` | SSO SAML 메타데이터 URL | `""` (비활성화) |
+| `allowed_origins` | CORS 허용 오리진 | `["*"]` |
 
-## Dashboards
+`terraform/terraform.tfvars`에 설정합니다 (`terraform.tfvars.example` 참조).
 
-### Grafana (Admin Dashboard — 43 panels, 9 sections)
+## 프로젝트 구조
 
-Premium admin dashboard: KPI (8 stats), Traffic Trends (hourly stacked), Core Web Vitals (gauges + percentiles), Errors & Crashes (trends + impact), Resources & Network, Mobile Vitals (iOS/Android), User Analysis (browser/OS/version), Page Performance (CWV per page), Session Explorer (30 sessions with duration). Platform and page filters.
+```
+aws-rum-pipeline/
+├── terraform/                    # IaC — Terraform 루트 + 11개 모듈
+│   └── modules/
+│       ├── s3-data-lake/         # S3 버킷 + 라이프사이클 정책
+│       ├── glue-catalog/         # Glue DB + 3개 테이블 정의
+│       ├── firehose/             # Kinesis Firehose + Transform Lambda
+│       ├── api-gateway/          # HTTP API + Ingest Lambda
+│       ├── security/             # WAF WebACL + SSM API Key
+│       ├── monitoring/           # CloudWatch 대시보드 (22개 위젯)
+│       ├── grafana/              # Managed Grafana + Athena 워크그룹
+│       ├── partition-repair/     # Glue 파티션 자동 복구 (EventBridge)
+│       ├── athena-query/         # Athena SQL 실행 Lambda
+│       ├── agent-ui/             # CloudFront + ALB + EC2
+│       └── auth/                 # Cognito SSO + Lambda@Edge
+├── lambda/                       # Lambda 함수 (Python 3.12)
+│   ├── authorizer/               # API Key 검증 (SSM 캐싱)
+│   ├── ingest/                   # HTTP → Firehose 포워딩
+│   ├── transform/                # 스키마 검증 + PII 제거 + 파티셔닝
+│   ├── partition-repair/         # MSCK REPAIR TABLE
+│   ├── athena-query/             # Athena SQL 실행 (AgentCore용)
+│   └── edge-auth/                # CloudFront Lambda@Edge JWT 검증 (Node.js)
+├── sdk/                          # Web RUM SDK (TypeScript, 12KB)
+├── mobile-sdk-ios/               # iOS RUM SDK (Swift 5.9, SPM)
+├── mobile-sdk-android/           # Android RUM SDK (Kotlin 1.9, Gradle)
+├── simulator/                    # 트래픽 생성기 (TypeScript, Docker, EKS)
+├── agentcore/                    # Bedrock AgentCore AI 에이전트 + Next.js UI
+├── cdk/                          # AWS CDK (TypeScript) — Terraform 대안
+├── scripts/                      # 빌드/배포/테스트 스크립트
+└── docs/                         # 아키텍처, ADR, 런북
+```
 
-### CloudWatch Dashboard
-
-22 operational widgets across 8 rows: API Gateway, Lambda functions, WAF, and Firehose metrics with Korean labels.
-
----
-
-## AI Analysis Agent
-
-**URL:** https://<distribution-id>.cloudfront.net
-
-Chat-based AI agent powered by Bedrock Claude Sonnet. Ask questions in natural language — the agent generates SQL, auto-executes on Athena, and returns analyzed results.
-
-Supports up to 3-round SQL execution loops with SSE streaming.
-
----
-
-## Deployed Resources
-
-| Resource | Value |
-|----------|-------|
-| API Endpoint | `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com` |
-| Grafana | `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com` |
-| Agent UI | `https://<distribution-id>.cloudfront.net` |
-| SSO Portal | `https://<directory-id>.awsapps.com/start` |
-| S3 Data Lake | `rum-pipeline-data-lake-<account-id>` |
-| Region | `ap-northeast-2` |
-
----
-
-## Testing
+## 테스트
 
 ```bash
-# Lambda unit tests (Python)
-cd lambda/authorizer && python3 -m pytest test_handler.py -v
-cd lambda/ingest && python3 -m pytest test_handler.py -v
-cd lambda/transform && python3 -m pytest test_handler.py -v
+# Lambda 단위 테스트 (Python)
+cd lambda/authorizer && python3 -m pytest test_handler.py -v   # 8개 테스트
+cd lambda/ingest && python3 -m pytest test_handler.py -v       # 7개 테스트
+cd lambda/transform && python3 -m pytest test_handler.py -v    # 8개 테스트
 
-# Web SDK unit tests (TypeScript)
-cd sdk && npx vitest run
+# Web SDK 단위 테스트 (TypeScript)
+cd sdk && npx vitest run                                       # 14개 테스트
 
-# Simulator tests
-cd simulator && npx vitest run
+# 시뮬레이터 테스트
+cd simulator && npx vitest run                                 # 3개 테스트
 
-# E2E integration tests
+# iOS SDK 테스트
+cd mobile-sdk-ios && swift test                                # 11개 테스트
+
+# Android SDK 테스트
+cd mobile-sdk-android && ./gradlew :rum-sdk:test               # 8개 테스트
+
+# E2E 통합 테스트
 ./scripts/test-ingestion.sh <api-endpoint> <api-key>
 ```
 
----
+## 기여 방법
 
-## Operations
+1. 리포지토리를 Fork합니다.
+2. 기능 브랜치를 생성합니다: `git checkout -b feat/my-feature`
+3. 변경사항을 커밋합니다: `git commit -m "feat: 새 기능 추가"`
+4. Fork에 푸시합니다: `git push origin feat/my-feature`
+5. Pull Request를 생성합니다.
 
-### Glue Partition Auto-Registration
+커밋 메시지는 [Conventional Commits](https://www.conventionalcommits.org/) 형식을 따릅니다: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
 
-EventBridge triggers `MSCK REPAIR TABLE` every 15 minutes via Lambda, ensuring new Firehose partitions are discoverable by Athena.
+## 라이선스
 
-### EKS Simulator Management
+이 프로젝트는 MIT 라이선스에 따라 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하십시오.
 
-```bash
-kubectl get cronjob -n rum                                    # Status
-kubectl create job test --from=cronjob/rum-simulator -n rum   # Manual run
-kubectl patch cronjob rum-simulator -n rum -p '{"spec":{"suspend":true}}'  # Pause
-```
+## 연락처
 
-### API Key Rotation
-
-```bash
-aws ssm put-parameter --name /rum-pipeline/dev/api-keys \
-  --value "old-key,new-key" --type SecureString --overwrite --region ap-northeast-2
-```
-
----
-
-<p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>
-
----
-
-## License
-
-Internal use only.
+- **메인테이너:** [whchoi98](https://github.com/whchoi98)
+- **이슈:** [GitHub Issues](https://github.com/whchoi98/aws-rum-pipeline/issues)
+- **리포지토리:** [github.com/whchoi98/aws-rum-pipeline](https://github.com/whchoi98/aws-rum-pipeline)
