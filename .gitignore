@@ -17,3 +17,5 @@ cdk.out/
 .env.*
 *.local.json
 settings.local.json
+datadog_img/
+img/
