@@ -8,7 +8,7 @@ A serverless Real User Monitoring pipeline built on AWS — collect, store, quer
 
 AWS 서버리스 기반 Real User Monitoring 파이프라인 — RUM 데이터를 대규모로 수집, 저장, 쿼리, 시각화합니다.
 
-🇺🇸 [English](#english) | 🇰🇷 [한국어](#한국어)
+[![English](https://img.shields.io/badge/lang-English-blue.svg)](#english) [![한국어](https://img.shields.io/badge/lang-한국어-red.svg)](#한국어)
 
 ---
 
