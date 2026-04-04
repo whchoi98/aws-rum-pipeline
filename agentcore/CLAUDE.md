@@ -1,11 +1,18 @@
-# AgentCore Module
+<p align="center">
+  <a href="#-한국어"><kbd>🇰🇷 한국어</kbd></a>&nbsp;&nbsp;&nbsp;
+  <a href="#-english"><kbd>🇺🇸 English</kbd></a>
+</p>
 
-## Role
+# 🇰🇷 한국어
+
+## AgentCore Module
+
+### Role
 Bedrock AgentCore 기반 RUM 분석 에이전트.
 Athena를 통해 RUM 데이터를 쿼리하고, 이상 감지, 성능 분석, 리포트 생성.
 Next.js 14 Web UI를 통해 사용자와 채팅 인터페이스 제공.
 
-## Key Files
+### Key Files
 - `agent.py` — 에이전트 메인. Strands Agent + MCP 도구 연결
 - `requirements.txt` — Python 의존성 (strands-agents, boto3 등)
 - `streamable_http_sigv4.py` — SigV4 인증 HTTP 클라이언트 유틸리티
@@ -14,7 +21,7 @@ Next.js 14 Web UI를 통해 사용자와 채팅 인터페이스 제공.
 - `Dockerfile` — 에이전트 컨테이너 이미지
 - `scripts/setup-agentcore.sh` — AgentCore 환경 설정 스크립트 (프로젝트 루트 `scripts/` 에 위치)
 
-## Key Commands
+### Key Commands
 ```bash
 # 에이전트 실행
 pip install -r requirements.txt
@@ -27,9 +34,51 @@ cd web && npm install && npm run dev
 docker build -t rum-agentcore .
 ```
 
-## Rules
+### Rules
 - AWS 자격증명은 IAM Role 또는 환경변수로 주입
 - Bedrock 모델 ID는 환경변수로 설정
 - MCP 도구는 `agent.py` 내 도구 목록으로 관리
 - Athena 쿼리는 파티션 필터 필수 (비용 최적화)
 - Web UI는 API Route를 통해 에이전트 호출 (직접 boto3 호출 금지)
+
+<p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
+
+# 🇺🇸 English
+
+## AgentCore Module
+
+### Role
+A RUM analytics agent powered by Bedrock AgentCore.
+Queries RUM data via Athena for anomaly detection, performance analysis, and report generation.
+Provides a chat interface for users through a Next.js 14 Web UI.
+
+### Key Files
+- `agent.py` — Agent main entry. Strands Agent + MCP tool integration
+- `requirements.txt` — Python dependencies (strands-agents, boto3, etc.)
+- `streamable_http_sigv4.py` — SigV4 authenticated HTTP client utility
+- `web/` — Next.js 14 Web UI (agent chat interface)
+- `web-app/` — Separately deployable Next.js app
+- `Dockerfile` — Agent container image
+- `scripts/setup-agentcore.sh` — AgentCore environment setup script (located in project root `scripts/`)
+
+### Key Commands
+```bash
+# Run agent
+pip install -r requirements.txt
+python3 agent.py
+
+# Web UI development
+cd web && npm install && npm run dev
+
+# Container build
+docker build -t rum-agentcore .
+```
+
+### Rules
+- AWS credentials injected via IAM Role or environment variables
+- Bedrock model ID set via environment variable
+- MCP tools managed as a tool list within `agent.py`
+- Athena queries must include partition filters (cost optimization)
+- Web UI calls the agent through API Routes (no direct boto3 calls)
+
+<p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>

@@ -1,5 +1,14 @@
 # Architecture
 
+<p align="center">
+  <a href="#-한국어"><kbd>🇰🇷 한국어</kbd></a>&nbsp;&nbsp;&nbsp;
+  <a href="#-english"><kbd>🇺🇸 English</kbd></a>
+</p>
+
+---
+
+# 🇰🇷 한국어
+
 ## System Overview
 
 AWS Custom RUM Pipeline은 서버리스 기반 이벤트 수집 및 분석 시스템.
@@ -250,3 +259,263 @@ CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 - Lambda Authorizer로 API Key 검증을 Gateway 레벨에서 처리
 - Glue 파티션을 날짜 기준으로 구성해 Athena 쿼리 비용 최소화
 - Bedrock AgentCore로 에이전트 인프라 관리 부담 제거
+
+<p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
+
+---
+
+# 🇺🇸 English
+
+## System Overview
+
+AWS Custom RUM Pipeline is a serverless event collection and analytics system.
+Browser SDK (TypeScript) and mobile SDKs (iOS Swift, Android Kotlin) collect RUM events and deliver them to AWS infrastructure via API Gateway.
+Events are stored in S3 through Firehose and made queryable via Glue/Athena.
+A Bedrock AgentCore-based AI agent analyzes the RUM data.
+
+## Components
+
+### Ingestion Layer
+- **sdk/** — TypeScript RUM SDK. Collects page views, errors, and user action events from the browser. Bundled with esbuild.
+- **mobile-sdk-ios/** — iOS RUM SDK (Swift 5.9+, SPM). Supports iOS 15+. Same event schema as the browser SDK.
+- **mobile-sdk-android/** — Android RUM SDK (Kotlin 1.9+, Gradle). Supports minSdk 26. Same event schema as the browser SDK.
+- **terraform/modules/api-gateway/** — HTTP API Gateway. Exposes the `/ingest` endpoint. Connected to Lambda Authorizer.
+- **lambda/authorizer/** — JWT/API Key validation Lambda Authorizer. Returns 403 on authentication failure.
+- **lambda/ingest/** — Bridge Lambda that forwards HTTP requests to Kinesis Firehose.
+
+### Storage Layer
+- **terraform/modules/firehose/** — Kinesis Data Firehose. Buffered delivery to S3. Includes partitioning configuration.
+- **terraform/modules/s3-data-lake/** — 3 S3 buckets: raw events, processed data, Athena query results.
+
+### Processing Layer
+- **lambda/transform/** — Firehose event transformation. JSON normalization, schema validation.
+- **lambda/partition-repair/** — Automatic Glue partition repair (`MSCK REPAIR TABLE`). Triggered by EventBridge schedule.
+- **terraform/modules/partition-repair/** — partition-repair Lambda infrastructure.
+
+### Query Layer
+- **terraform/modules/glue-catalog/** — AWS Glue database and table schema definitions.
+- **lambda/athena-query/** — Lambda for executing Athena queries and polling/returning results.
+- **terraform/modules/athena-query/** — athena-query Lambda infrastructure.
+
+### Observability Layer
+- **terraform/modules/monitoring/** — CloudWatch dashboards, alarms (Lambda error rate, Firehose latency, API response, etc.).
+- **terraform/modules/grafana/** — Amazon Managed Grafana workspace. Connected to Athena data source.
+
+### Security Layer
+- **terraform/modules/security/** — WAF WebACL, API Key management, IAM roles/policies.
+- **terraform/modules/auth/** — Cognito User Pool + SSO IdP + Lambda@Edge authentication.
+  - JWT validation at CloudFront viewer-request; redirects to Cognito Hosted UI when unauthenticated.
+  - User identification via `x-user-sub` header; per-user conversation history isolation in AgentCore Memory.
+
+### Analysis Agent
+- **agentcore/** — Bedrock AgentCore-based RUM analysis agent.
+  - `agent.py` — Strands Agent + MCP tool integration. Athena queries, anomaly detection, report generation.
+  - `web/` — Next.js 14 Web UI (agent chat interface).
+  - `web-app/` — Independently deployable Next.js app.
+- **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure.
+
+### Traffic Simulation
+- **simulator/** — TypeScript traffic generator. Simulates actual browser SDK calls. Dockerized.
+
+## Full Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Clients (SDK)                                      │
+│  ┌──────────────┐  ┌──────────────────┐  ┌───────────────────┐                  │
+│  │ Web SDK      │  │ iOS SDK (Swift)  │  │ Android SDK       │                  │
+│  │ (TypeScript) │  │                  │  │ (Kotlin)          │                  │
+│  └──────┬───────┘  └────────┬─────────┘  └─────────┬─────────┘                  │
+└─────────┼──────────────────┼───────────────────────┼────────────────────────────┘
+          │                  │                       │
+          └──────────────────┼───────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           Ingestion Pipeline                                    │
+│                                                                                 │
+│  ┌─────────┐    ┌──────────────┐    ┌──────────────┐    ┌───────────────────┐   │
+│  │  WAF    │───▶│ API Gateway  │───▶│   Lambda     │───▶│ Kinesis Firehose  │   │
+│  │ WebACL  │    │ (HTTP API)   │    │ Authorizer   │    │                   │   │
+│  │ - Rate  │    │              │    │ (API Key/SSM)│    │ - Dynamic         │   │
+│  │ - Bot   │    │ POST         │    └──────────────┘    │   Partitioning    │   │
+│  └─────────┘    │ /v1/events   │                        │ - Parquet         │   │
+│                 │ /v1/events/  │    ┌──────────────┐    │   Conversion      │   │
+│                 │   beacon     │───▶│   Lambda     │◀───│                   │   │
+│                 └──────────────┘    │   Ingest     │    └────────┬──────────┘   │
+│                                    │ (→ Firehose)  │             │              │
+│                                    └──────────────┘    ┌────────┼──────────┐   │
+│                                                        │        ▼          │   │
+│                                                        │  Lambda Transform │   │
+│                                                        │  (JSON → Parquet) │   │
+│                                                        │  (PII Removal)    │   │
+│                                                        └───────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                                                  │
+                                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            Storage & Catalog                                    │
+│                                                                                 │
+│  ┌───────────────────────────────────────┐    ┌────────────────────────────┐    │
+│  │          S3 Data Lake                 │    │      Glue Catalog          │    │
+│  │                                       │    │                            │    │
+│  │  raw/platform=web/year/month/day/hour │    │  DB: rum_pipeline_db       │    │
+│  │  aggregated/hourly/                   │    │  ├─ rum_events             │    │
+│  │  aggregated/daily/                    │    │  ├─ rum_hourly_metrics     │    │
+│  │  athena-results/                      │    │  └─ rum_daily_summary      │    │
+│  │  errors/                              │    │                            │    │
+│  └───────────────────────────────────────┘    └────────────────────────────┘    │
+│                                                            ▲                    │
+│                          ┌─────────────────────────────────┘                    │
+│                          │                                                      │
+│                 ┌────────┴────────┐                                             │
+│                 │ Lambda          │   EventBridge (every 15 min)                 │
+│                 │ Partition Repair│◀── rate(15 minutes)                          │
+│                 │ (MSCK REPAIR)  │                                               │
+│                 └────────────────┘                                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          Query & Visualization                                  │
+│                                                                                 │
+│  ┌───────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐   │
+│  │ Athena Workgroup  │    │ Amazon Managed       │    │ CloudWatch          │   │
+│  │ rum-pipeline-     │───▶│ Grafana              │    │ Dashboard           │   │
+│  │ athena            │    │                      │    │                     │   │
+│  │                   │    │ - KPI                │    │ - API Req/Errors    │   │
+│  │ - 100GB Scan      │    │ - Performance        │    │ - Lambda Invoc/Err  │   │
+│  │   Limit           │    │   Overview           │    │ - WAF Allow/Block   │   │
+│  └─────────┬─────────┘    │ - Crashes/Errors     │    │ - Firehose In/Out   │   │
+│            │              │ - Resource Analysis   │    │ - 22 Widgets        │   │
+│            │              │ - Mobile Vitals       │    └─────────────────────┘   │
+│            │              │ - User Sessions       │                              │
+│            │              │                      │                              │
+│            │              │ SSO Auth             │                              │
+│            │              └──────────────────────┘                              │
+└────────────┼────────────────────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        AI Analysis Agent (Agent UI)                              │
+│                                                                                 │
+│  ┌───────────┐   ┌─────────────┐   ┌─────────┐   ┌──────────────────────────┐  │
+│  │ CloudFront│──▶│ Lambda@Edge │──▶│  ALB    │──▶│ EC2 (t4g.large)         │  │
+│  │           │   │ viewer-req  │   │ (HTTP)  │   │                          │  │
+│  │ HTTPS     │   │             │   │         │   │ Next.js 14 Chat UI       │  │
+│  │           │   │ JWT Verify  │   │ SG:     │   │ ├─ /api/chat (SSE)       │  │
+│  │           │   │ ┌─────────┐ │   │ CF only │   │ │  └─ Bedrock Claude     │  │
+│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4            │  │
+│  │           │   │ │ User    │ │   └─────────┘   │ │  └─ Athena Query Lambda│  │
+│  │           │   │ │ Pool    │ │                  │ │     (Auto SQL Gen/Exec)│  │
+│  │           │   │ │ + SSO   │ │                  │ │                         │  │
+│  │           │   │ │ IdP     │ │                  │ └─ x-user-sub Header     │  │
+│  │           │   │ └─────────┘ │                  │    └─ Per-User Memory    │  │
+│  └───────────┘   │             │                  │                          │  │
+│                  │ x-user-sub  │                  │ ┌──────────────────────┐  │  │
+│                  │ Header      │                  │ │ Bedrock AgentCore    │  │  │
+│                  │ Injection   │                  │ │ - Runtime            │  │  │
+│                  └─────────────┘                  │ │ - Gateway (Athena)   │  │  │
+│                                                   │ │ - Memory (per-user)  │  │  │
+│                                                   │ └──────────────────────┘  │  │
+│                                                   └──────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          Infrastructure Management (IaC)                        │
+│                                                                                 │
+│  ┌──────────────────────────┐    ┌──────────────────────────┐                   │
+│  │ Terraform (HCL)          │    │ CDK (TypeScript)          │                   │
+│  │ 11 Modules:              │    │ 11 Constructs:            │                   │
+│  │ s3-data-lake, glue,      │    │ S3DataLake, GlueCatalog,  │                   │
+│  │ firehose, api-gateway,   │    │ Firehose, ApiGateway,     │                   │
+│  │ security, monitoring,    │    │ Security, Monitoring,     │                   │
+│  │ grafana, partition-repair│    │ Grafana, PartitionRepair, │                   │
+│  │ athena-query, agent-ui,  │    │ AthenaQuery, AgentUi,     │                   │
+│  │ auth                     │    │ Auth                      │                   │
+│  └──────────────────────────┘    └──────────────────────────┘                   │
+│                                                                                 │
+│  State: S3 + DynamoDB Lock          Shared Lambda Source (lambda/)              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Testing & Simulation                               │
+│                                                                                 │
+│  ┌─────────────────────────┐    ┌──────────────────────────────────┐            │
+│  │ Simulator (TypeScript)  │    │ EKS CronJob (every 5 min)        │            │
+│  │ - Web 60%               │    │ - rum-simulator container         │            │
+│  │ - iOS 25%               │    │ - ECR image                       │            │
+│  │ - Android 15%           │    │ - API Key Secret                  │            │
+│  │ - Docker container      │    └──────────────────────────────────┘            │
+│  └─────────────────────────┘                                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Data Flow Summary
+
+```
+SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transform Lambda → S3 (Parquet)
+                                                                                      │
+                                              ┌───────────────────────────────────────┘
+                                              ▼
+                                   Glue Catalog ← Partition Repair (15 min)
+                                              │
+                              ┌───────────────┼───────────────┐
+                              ▼               ▼               ▼
+                          Grafana      CloudWatch       Agent UI
+                       (Visualization) (Ops Monitoring) (AI Analysis)
+                                                              │
+                                                    Bedrock Claude Sonnet
+                                                    + Auto Athena SQL Generation
+                                                    + Per-User Memory
+```
+
+## Infrastructure
+
+### AWS Region
+- ap-northeast-2 (Seoul)
+
+### Terraform Modules (terraform/modules/)
+| Module | Resources | Description |
+|--------|-----------|-------------|
+| s3-data-lake | S3 Buckets | raw, processed, athena-results |
+| glue-catalog | Glue DB + Table | rum_events schema |
+| firehose | Kinesis Firehose | S3 delivery, transform Lambda integration |
+| api-gateway | HTTP API, Lambda Integration | /ingest POST |
+| security | WAF, API Key, IAM | Authentication/authorization infrastructure |
+| monitoring | CloudWatch | Dashboards, alarms |
+| grafana | AMG Workspace | Athena data source |
+| partition-repair | Lambda, EventBridge | Automatic partition repair |
+| athena-query | Lambda | Query execution API |
+| agent-ui | CloudFront + ALB + EC2 | AgentCore Web UI hosting |
+| auth | Cognito, Lambda@Edge | SSO authentication + JWT validation |
+
+### Deployed Resources (ap-northeast-2)
+- API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
+- Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com`
+- SSM Parameter: `/rum-pipeline/dev/api-keys`
+
+### CDK (TypeScript Alternative)
+| Construct | Terraform Equivalent | Description |
+|-----------|---------------------|-------------|
+| S3DataLake | s3-data-lake | S3 buckets + lifecycle |
+| GlueCatalog | glue-catalog | Glue DB + 3 tables |
+| Firehose | firehose | Firehose + Transform Lambda |
+| Security | security | WAF + SSM + Authorizer |
+| ApiGateway | api-gateway | HTTP API + Ingest Lambda |
+| Grafana | grafana | Managed Grafana + Athena WG |
+| Monitoring | monitoring | CloudWatch Dashboard |
+| PartitionRepair | partition-repair | Partition repair + EventBridge |
+| AthenaQuery | athena-query | Athena Query Lambda |
+| AgentUi | agent-ui | CloudFront + ALB + EC2 |
+| Auth | auth | Cognito + SSO + Lambda@Edge |
+
+CDK commands: `cd cdk && npx cdk synth / deploy / diff`
+
+## Key Design Decisions
+
+- Firehose as an intermediate buffer to support high throughput without Lambda throttling
+- Lambda Authorizer validates API Keys at the Gateway level
+- Glue partitions organized by date to minimize Athena query costs
+- Bedrock AgentCore eliminates the burden of managing agent infrastructure
+
+<p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>
