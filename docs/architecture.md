@@ -51,17 +51,155 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 ### Traffic Simulation
 - **simulator/** — TypeScript 트래픽 생성기. 실제 브라우저 SDK 호출 시뮬레이션. Docker 컨테이너화.
 
-## Data Flow
+## Full Architecture Diagram
 
 ```
-Browser
-  └─(SDK)─→ API Gateway (/ingest)
-              └─(Lambda Authorizer: 인증)─→ ingest Lambda
-                                              └─→ Kinesis Firehose
-                                                    └─(transform Lambda)─→ S3 (raw/)
-                                                                             └─(partition-repair)─→ Glue Catalog
-                                                                                                     └─→ Athena
-                                                                                                           └─→ Grafana / AgentCore Web UI
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              클라이언트 (SDK)                                    │
+│  ┌──────────────┐  ┌──────────────────┐  ┌───────────────────┐                  │
+│  │ Web SDK      │  │ iOS SDK (Swift)  │  │ Android SDK       │                  │
+│  │ (TypeScript) │  │                  │  │ (Kotlin)          │                  │
+│  └──────┬───────┘  └────────┬─────────┘  └─────────┬─────────┘                  │
+└─────────┼──────────────────┼───────────────────────┼────────────────────────────┘
+          │                  │                       │
+          └──────────────────┼───────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           인제스트 파이프라인                                     │
+│                                                                                 │
+│  ┌─────────┐    ┌──────────────┐    ┌──────────────┐    ┌───────────────────┐   │
+│  │  WAF    │───▶│ API Gateway  │───▶│   Lambda     │───▶│ Kinesis Firehose  │   │
+│  │ WebACL  │    │ (HTTP API)   │    │ Authorizer   │    │                   │   │
+│  │ - Rate  │    │              │    │ (API Key/SSM)│    │ - 동적 파티셔닝    │   │
+│  │ - Bot   │    │ POST         │    └──────────────┘    │ - Parquet 변환    │   │
+│  └─────────┘    │ /v1/events   │                        │                   │   │
+│                 │ /v1/events/  │    ┌──────────────┐    │                   │   │
+│                 │   beacon     │───▶│   Lambda     │◀───│                   │   │
+│                 └──────────────┘    │   Ingest     │    └────────┬──────────┘   │
+│                                    │ (→ Firehose)  │             │              │
+│                                    └──────────────┘    ┌────────┼──────────┐   │
+│                                                        │        ▼          │   │
+│                                                        │  Lambda Transform │   │
+│                                                        │  (JSON → Parquet) │   │
+│                                                        │  (PII 제거)       │   │
+│                                                        └───────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                                                  │
+                                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            스토리지 & 카탈로그                                    │
+│                                                                                 │
+│  ┌───────────────────────────────────────┐    ┌────────────────────────────┐    │
+│  │          S3 Data Lake                 │    │      Glue Catalog          │    │
+│  │                                       │    │                            │    │
+│  │  raw/platform=web/year/month/day/hour │    │  DB: rum_pipeline_db       │    │
+│  │  aggregated/hourly/                   │    │  ├─ rum_events             │    │
+│  │  aggregated/daily/                    │    │  ├─ rum_hourly_metrics     │    │
+│  │  athena-results/                      │    │  └─ rum_daily_summary      │    │
+│  │  errors/                              │    │                            │    │
+│  └───────────────────────────────────────┘    └────────────────────────────┘    │
+│                                                            ▲                    │
+│                          ┌─────────────────────────────────┘                    │
+│                          │                                                      │
+│                 ┌────────┴────────┐                                             │
+│                 │ Lambda          │   EventBridge (15분 간격)                     │
+│                 │ Partition Repair│◀── rate(15 minutes)                          │
+│                 │ (MSCK REPAIR)  │                                               │
+│                 └────────────────┘                                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          쿼리 & 시각화                                           │
+│                                                                                 │
+│  ┌───────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐   │
+│  │ Athena Workgroup  │    │ Amazon Managed       │    │ CloudWatch          │   │
+│  │ rum-pipeline-     │───▶│ Grafana              │    │ Dashboard           │   │
+│  │ athena            │    │                      │    │                     │   │
+│  │                   │    │ - KPI                │    │ - API 요청/에러      │   │
+│  │ - 100GB 스캔 제한  │    │ - 성능 개요           │    │ - Lambda 호출/에러   │   │
+│  │ - Parquet 쿼리    │    │ - 크래시/에러         │    │ - WAF 허용/차단      │   │
+│  └─────────┬─────────┘    │ - 리소스 분석         │    │ - Firehose 수신/전송 │   │
+│            │              │ - 모바일 바이탈        │    │ - 22개 위젯         │   │
+│            │              │ - 사용자 세션          │    └─────────────────────┘   │
+│            │              │                      │                              │
+│            │              │ SSO 인증              │                              │
+│            │              └──────────────────────┘                              │
+└────────────┼────────────────────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        AI 분석 에이전트 (Agent UI)                                │
+│                                                                                 │
+│  ┌───────────┐   ┌─────────────┐   ┌─────────┐   ┌──────────────────────────┐  │
+│  │ CloudFront│──▶│ Lambda@Edge │──▶│  ALB    │──▶│ EC2 (t4g.large)         │  │
+│  │           │   │ viewer-req  │   │ (HTTP)  │   │                          │  │
+│  │ HTTPS     │   │             │   │         │   │ Next.js 14 Chat UI       │  │
+│  │           │   │ JWT 검증    │   │ SG:     │   │ ├─ /api/chat (SSE)       │  │
+│  │           │   │ ┌─────────┐ │   │ CF only │   │ │  └─ Bedrock Claude     │  │
+│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4            │  │
+│  │           │   │ │ User    │ │   └─────────┘   │ │  └─ Athena Query Lambda│  │
+│  │           │   │ │ Pool    │ │                  │ │     (SQL 자동 생성/실행) │  │
+│  │           │   │ │ + SSO   │ │                  │ │                         │  │
+│  │           │   │ │ IdP     │ │                  │ └─ x-user-sub 헤더       │  │
+│  │           │   │ └─────────┘ │                  │    └─ 사용자별 Memory     │  │
+│  └───────────┘   │             │                  │                          │  │
+│                  │ x-user-sub  │                  │ ┌──────────────────────┐  │  │
+│                  │ 헤더 주입    │                  │ │ Bedrock AgentCore    │  │  │
+│                  └─────────────┘                  │ │ - Runtime            │  │  │
+│                                                   │ │ - Gateway (Athena)   │  │  │
+│                                                   │ │ - Memory (per-user)  │  │  │
+│                                                   │ └──────────────────────┘  │  │
+│                                                   └──────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              인프라 관리 (IaC)                                   │
+│                                                                                 │
+│  ┌──────────────────────────┐    ┌──────────────────────────┐                   │
+│  │ Terraform (HCL)          │    │ CDK (TypeScript)          │                   │
+│  │ 11개 모듈:               │    │ 11개 Construct:           │                   │
+│  │ s3-data-lake, glue,      │    │ S3DataLake, GlueCatalog,  │                   │
+│  │ firehose, api-gateway,   │    │ Firehose, ApiGateway,     │                   │
+│  │ security, monitoring,    │    │ Security, Monitoring,     │                   │
+│  │ grafana, partition-repair│    │ Grafana, PartitionRepair, │                   │
+│  │ athena-query, agent-ui,  │    │ AthenaQuery, AgentUi,     │                   │
+│  │ auth                     │    │ Auth                      │                   │
+│  └──────────────────────────┘    └──────────────────────────┘                   │
+│                                                                                 │
+│  State: S3 + DynamoDB Lock          Lambda 소스 공유 (lambda/)                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              테스트 & 시뮬레이션                                  │
+│                                                                                 │
+│  ┌─────────────────────────┐    ┌──────────────────────────────────┐            │
+│  │ Simulator (TypeScript)  │    │ EKS CronJob (5분 간격)            │            │
+│  │ - Web 60%               │    │ - rum-simulator 컨테이너          │            │
+│  │ - iOS 25%               │    │ - ECR 이미지                      │            │
+│  │ - Android 15%           │    │ - API Key Secret                  │            │
+│  │ - Docker 컨테이너       │    └──────────────────────────────────┘            │
+│  └─────────────────────────┘                                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Data Flow Summary
+
+```
+SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transform Lambda → S3 (Parquet)
+                                                                                      │
+                                              ┌───────────────────────────────────────┘
+                                              ▼
+                                   Glue Catalog ← Partition Repair (15분)
+                                              │
+                              ┌───────────────┼───────────────┐
+                              ▼               ▼               ▼
+                          Grafana      CloudWatch       Agent UI
+                         (시각화)      (운영 모니터링)   (AI 분석)
+                                                              │
+                                                    Bedrock Claude Sonnet
+                                                    + Athena SQL 자동 생성
+                                                    + Per-User Memory
 ```
 
 ## Infrastructure
@@ -82,6 +220,7 @@ Browser
 | partition-repair | Lambda, EventBridge | 파티션 자동 복구 |
 | athena-query | Lambda | 쿼리 실행 API |
 | agent-ui | CloudFront + ALB + EC2 | AgentCore Web UI 호스팅 |
+| auth | Cognito, Lambda@Edge | SSO 인증 + JWT 검증 |
 
 ### Deployed Resources (ap-northeast-2)
 - API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
@@ -101,6 +240,7 @@ Browser
 | PartitionRepair | partition-repair | 파티션 복구 + EventBridge |
 | AthenaQuery | athena-query | Athena Query Lambda |
 | AgentUi | agent-ui | CloudFront + ALB + EC2 |
+| Auth | auth | Cognito + SSO + Lambda@Edge |
 
 CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 
