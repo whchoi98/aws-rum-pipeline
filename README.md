@@ -1,19 +1,15 @@
 # AWS Custom RUM Pipeline
 
-> AWS 서버리스 기반 Real User Monitoring 파이프라인
->
 > AWS Serverless Real User Monitoring Pipeline
 
----
-
-## Language / 언어 선택
-
-| [한국어](#한국어) | [English](#english) |
-|:-:|:-:|
+<p align="center">
+  <a href="#-한국어"><kbd>🇰🇷 한국어</kbd></a>&nbsp;&nbsp;&nbsp;
+  <a href="#-english"><kbd>🇺🇸 English</kbd></a>
+</p>
 
 ---
 
-# 한국어
+# 🇰🇷 한국어
 
 ## 목차
 
@@ -25,12 +21,12 @@
 | [사전 조건](#사전-조건) | 설치 요구사항 |
 | [빠른 시작](#빠른-시작) | 설치 및 실행 |
 | [프로젝트 구조](#프로젝트-구조) | 디렉토리 레이아웃 |
-| [인프라 모듈](#인프라-모듈-terraform) | Terraform 10개 모듈 상세 |
-| [Lambda 함수](#lambda-함수) | 5개 Lambda 역할 |
+| [인프라 모듈](#인프라-모듈-terraform) | Terraform 11개 모듈 상세 |
+| [Lambda 함수](#lambda-함수) | 6개 Lambda 역할 |
 | [Web SDK](#web-sdk-typescript) | 브라우저 RUM 수집 |
 | [Mobile SDK](#mobile-sdk) | iOS (Swift) + Android (Kotlin) |
 | [시뮬레이터](#시뮬레이터) | 테스트 트래픽 생성 |
-| [대시보드](#대시보드) | Grafana + CloudWatch |
+| [대시보드](#대시보드) | Grafana (43패널) + CloudWatch |
 | [AI 분석 에이전트](#ai-분석-에이전트) | Bedrock AgentCore |
 | [배포 리소스](#배포된-리소스) | 엔드포인트 및 식별자 |
 | [테스트](#테스트) | 단위/통합 테스트 실행 |
@@ -619,9 +615,11 @@ aws ssm put-parameter --name /rum-pipeline/dev/api-keys \
 
 ---
 
+<p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
+
 ---
 
-# English
+# 🇺🇸 English
 
 ## Table of Contents
 
@@ -633,11 +631,12 @@ aws ssm put-parameter --name /rum-pipeline/dev/api-keys \
 | [Prerequisites](#prerequisites) | Installation requirements |
 | [Quick Start](#quick-start) | Installation and execution |
 | [Project Structure](#project-structure-1) | Directory layout |
-| [Infrastructure](#infrastructure-modules-terraform) | 10 Terraform modules |
+| [Infrastructure](#infrastructure-modules-terraform) | 11 Terraform modules |
+| [Lambda Functions](#lambda-functions) | 6 Lambda roles |
 | [Web SDK](#web-sdk-typescript-1) | Browser RUM collection |
 | [Mobile SDKs](#mobile-sdks) | iOS (Swift) + Android (Kotlin) |
 | [Simulator](#simulator) | Test traffic generation |
-| [Dashboards](#dashboards) | Grafana + CloudWatch |
+| [Dashboards](#dashboards) | Grafana (43 panels) + CloudWatch |
 | [AI Analysis Agent](#ai-analysis-agent) | Bedrock AgentCore |
 | [Deployed Resources](#deployed-resources) | Endpoints and identifiers |
 | [Testing](#testing) | Unit and integration tests |
@@ -733,10 +732,22 @@ SDK (Web/iOS/Android) → WAF → HTTP API → Lambda Authorizer → Ingest Lamb
 | `partition-repair` | Auto-register Glue partitions (15min) |
 | `athena-query` | Athena SQL execution Lambda for AgentCore |
 | `agent-ui` | CloudFront + ALB + EC2 for AI chat UI |
+| `auth` | Cognito SSO + Lambda@Edge JWT authentication |
+
+### Lambda Functions
+
+| Function | Trigger | Role |
+|----------|---------|------|
+| `authorizer` | API Gateway Lambda Authorizer | API Key validation (SSM cached) |
+| `ingest` | API Gateway HTTP Integration | HTTP → Firehose forwarding |
+| `transform` | Firehose Data Transformation | JSON normalize, PII strip, Parquet |
+| `partition-repair` | EventBridge (15min) | Glue MSCK REPAIR TABLE |
+| `athena-query` | Direct invoke (AgentCore) | Athena SQL execution |
+| `edge-auth` | CloudFront Lambda@Edge | Cognito JWT verification (Node.js) |
 
 ### CDK (TypeScript Alternative)
 
-Same infrastructure as Terraform, written in TypeScript. 10 Constructs map 1:1 to Terraform modules.
+Same infrastructure as Terraform, written in TypeScript. 11 Constructs map 1:1 to Terraform modules.
 
 ```bash
 cd cdk && npm install
@@ -873,6 +884,10 @@ kubectl patch cronjob rum-simulator -n rum -p '{"spec":{"suspend":true}}'  # Pau
 aws ssm put-parameter --name /rum-pipeline/dev/api-keys \
   --value "old-key,new-key" --type SecureString --overwrite --region ap-northeast-2
 ```
+
+---
+
+<p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>
 
 ---
 
