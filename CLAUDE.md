@@ -62,7 +62,9 @@ cdk/                - AWS CDK (TypeScript) — Terraform과 동일 인프라
 scripts/            - 빌드/배포/테스트 쉘 스크립트
 docs/               - 아키텍처 문서, ADR, 런북
 .claude/            - Claude Code 설정 (hooks, skills)
+.kiro/              - Kiro 에이전트 설정
 tools/              - 프롬프트, 유틸리티 스크립트
+CHANGELOG.md        - 릴리스 변경 이력 (Keep a Changelog)
 ```
 
 ### Key Commands
@@ -209,7 +211,9 @@ cdk/                - AWS CDK (TypeScript) — same infrastructure as Terraform
 scripts/            - Build/deploy/test shell scripts
 docs/               - Architecture docs, ADRs, runbooks
 .claude/            - Claude Code configuration (hooks, skills)
+.kiro/              - Kiro agent configuration
 tools/              - Prompts, utility scripts
+CHANGELOG.md        - Release changelog (Keep a Changelog)
 ```
 
 ### Key Commands
