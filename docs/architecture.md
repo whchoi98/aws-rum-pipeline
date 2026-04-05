@@ -125,13 +125,13 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 │  │ Athena Workgroup  │    │ Amazon Managed       │    │ CloudWatch          │   │
 │  │ rum-pipeline-     │───▶│ Grafana              │    │ Dashboard           │   │
 │  │ athena            │    │                      │    │                     │   │
-│  │                   │    │ - KPI                │    │ - API 요청/에러      │   │
-│  │ - 100GB 스캔 제한  │    │ - 성능 개요           │    │ - Lambda 호출/에러   │   │
-│  │ - Parquet 쿼리    │    │ - 크래시/에러         │    │ - WAF 허용/차단      │   │
-│  └─────────┬─────────┘    │ - 리소스 분석         │    │ - Firehose 수신/전송 │   │
+│  │                   │    │ - 핵심 KPI (8)       │    │ - API 요청/에러      │   │
+│  │ - 100GB 스캔 제한  │    │ - Core Web Vitals    │    │ - Lambda 호출/에러   │   │
+│  │ - Parquet 쿼리    │    │ - 에러 & 크래시      │    │ - WAF 허용/차단      │   │
+│  └─────────┬─────────┘    │ - 리소스/네트워크     │    │ - Firehose 수신/전송 │   │
 │            │              │ - 모바일 바이탈        │    │ - 22개 위젯         │   │
-│            │              │ - 사용자 세션          │    └─────────────────────┘   │
-│            │              │                      │                              │
+│            │              │ - 사용자/세션 탐색기   │    └─────────────────────┘   │
+│            │              │ 43패널 9섹션 (KST)    │                              │
 │            │              │ SSO 인증              │                              │
 │            │              └──────────────────────┘                              │
 └────────────┼────────────────────────────────────────────────────────────────────┘
@@ -233,7 +233,9 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 
 ### Deployed Resources (ap-northeast-2)
 - API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
-- Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com`
+- Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com/d/rum-unified-v2`
+- Agent UI: `https://<distribution-id>.cloudfront.net`
+- SSO Portal: `https://<directory-id>.awsapps.com/start`
 - SSM Parameter: `/rum-pipeline/dev/api-keys`
 
 ### CDK (TypeScript 대안)
@@ -259,6 +261,10 @@ CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 - Lambda Authorizer로 API Key 검증을 Gateway 레벨에서 처리
 - Glue 파티션을 날짜 기준으로 구성해 Athena 쿼리 비용 최소화
 - Bedrock AgentCore로 에이전트 인프라 관리 부담 제거
+- CloudFront + Lambda@Edge + Cognito SSO로 인프라 레벨 인증 (앱 코드 변경 최소)
+- Cognito sub 클레임을 session_id로 사용하여 사용자별 AgentCore Memory 분리
+- Grafana 대시보드 날짜 필터를 KST(Asia/Seoul) 기준으로 처리 (UTC 오차 방지)
+- Terraform + CDK 듀얼 IaC로 팀별 선호 도구 선택 가능 (Lambda 소스 공유)
 
 <p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
 
@@ -382,14 +388,14 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 │  │ Athena Workgroup  │    │ Amazon Managed       │    │ CloudWatch          │   │
 │  │ rum-pipeline-     │───▶│ Grafana              │    │ Dashboard           │   │
 │  │ athena            │    │                      │    │                     │   │
-│  │                   │    │ - KPI                │    │ - API Req/Errors    │   │
-│  │ - 100GB Scan      │    │ - Performance        │    │ - Lambda Invoc/Err  │   │
-│  │   Limit           │    │   Overview           │    │ - WAF Allow/Block   │   │
-│  └─────────┬─────────┘    │ - Crashes/Errors     │    │ - Firehose In/Out   │   │
-│            │              │ - Resource Analysis   │    │ - 22 Widgets        │   │
-│            │              │ - Mobile Vitals       │    └─────────────────────┘   │
-│            │              │ - User Sessions       │                              │
-│            │              │                      │                              │
+│  │                   │    │ - KPI (8 stats)      │    │ - API Req/Errors    │   │
+│  │ - 100GB Scan      │    │ - Core Web Vitals    │    │ - Lambda Invoc/Err  │   │
+│  │   Limit           │    │ - Errors & Crashes   │    │ - WAF Allow/Block   │   │
+│  └─────────┬─────────┘    │ - Resources/Network  │    │ - Firehose In/Out   │   │
+│            │              │ - Mobile Vitals       │    │ - 22 Widgets        │   │
+│            │              │ - User/Session Expl.  │    └─────────────────────┘   │
+│            │              │ 43 panels, 9 sections │                              │
+│            │              │ (KST timezone)        │                              │
 │            │              │ SSO Auth             │                              │
 │            │              └──────────────────────┘                              │
 └────────────┼────────────────────────────────────────────────────────────────────┘
@@ -491,7 +497,9 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 
 ### Deployed Resources (ap-northeast-2)
 - API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
-- Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com`
+- Grafana: `https://<workspace-id>.grafana-workspace.ap-northeast-2.amazonaws.com/d/rum-unified-v2`
+- Agent UI: `https://<distribution-id>.cloudfront.net`
+- SSO Portal: `https://<directory-id>.awsapps.com/start`
 - SSM Parameter: `/rum-pipeline/dev/api-keys`
 
 ### CDK (TypeScript Alternative)
@@ -517,5 +525,9 @@ CDK commands: `cd cdk && npx cdk synth / deploy / diff`
 - Lambda Authorizer validates API Keys at the Gateway level
 - Glue partitions organized by date to minimize Athena query costs
 - Bedrock AgentCore eliminates the burden of managing agent infrastructure
+- CloudFront + Lambda@Edge + Cognito SSO for infrastructure-level authentication (minimal app code changes)
+- Cognito sub claim used as session_id for per-user AgentCore Memory isolation
+- Grafana dashboard date filters use KST (Asia/Seoul) timezone to prevent UTC offset issues
+- Dual IaC with Terraform + CDK for team tool preference flexibility (shared Lambda source)
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>
