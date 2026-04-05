@@ -8,28 +8,32 @@ DS_UID = "efhx8g5mrvuo0d"
 DB = "rum_pipeline_db"
 TBL = f"{DB}.rum_events"
 
-# 날짜 필터 (오늘 + 어제)
+# KST 기준 날짜 (Athena current_date는 UTC — 한국 시간 오전 9시 전 날짜 불일치 방지)
+KST_TODAY = "date(current_timestamp AT TIME ZONE 'Asia/Seoul')"
+KST_YESTERDAY = f"date_add('day', -1, {KST_TODAY})"
+
+# 날짜 필터 (오늘 + 어제, KST)
 DF = (
-    "year = CAST(year(current_date) AS VARCHAR) "
-    "AND month = LPAD(CAST(month(current_date) AS VARCHAR), 2, '0') "
-    "AND day IN (LPAD(CAST(day(current_date) AS VARCHAR), 2, '0'), "
-    "LPAD(CAST(day(date_add('day', -1, current_date)) AS VARCHAR), 2, '0'))"
+    f"year = CAST(year({KST_TODAY}) AS VARCHAR) "
+    f"AND month = LPAD(CAST(month({KST_TODAY}) AS VARCHAR), 2, '0') "
+    f"AND day IN (LPAD(CAST(day({KST_TODAY}) AS VARCHAR), 2, '0'), "
+    f"LPAD(CAST(day({KST_YESTERDAY}) AS VARCHAR), 2, '0'))"
 )
 PF = DF + " AND ('${platform}' = 'all' OR platform = '${platform}') AND ('${page}' = 'all' OR json_extract_scalar(context, '$.url') LIKE '%' || '${page}' || '%')"
 
-# 오늘만
+# 오늘만 (KST)
 TDF = (
-    "year = CAST(year(current_date) AS VARCHAR) "
-    "AND month = LPAD(CAST(month(current_date) AS VARCHAR), 2, '0') "
-    "AND day = LPAD(CAST(day(current_date) AS VARCHAR), 2, '0')"
+    f"year = CAST(year({KST_TODAY}) AS VARCHAR) "
+    f"AND month = LPAD(CAST(month({KST_TODAY}) AS VARCHAR), 2, '0') "
+    f"AND day = LPAD(CAST(day({KST_TODAY}) AS VARCHAR), 2, '0')"
 )
 TPF = TDF + " AND ('${platform}' = 'all' OR platform = '${platform}') AND ('${page}' = 'all' OR json_extract_scalar(context, '$.url') LIKE '%' || '${page}' || '%')"
 
-# 어제만
+# 어제만 (KST)
 YDF = (
-    "year = CAST(year(current_date) AS VARCHAR) "
-    "AND month = LPAD(CAST(month(current_date) AS VARCHAR), 2, '0') "
-    "AND day = LPAD(CAST(day(date_add('day', -1, current_date)) AS VARCHAR), 2, '0')"
+    f"year = CAST(year({KST_TODAY}) AS VARCHAR) "
+    f"AND month = LPAD(CAST(month({KST_TODAY}) AS VARCHAR), 2, '0') "
+    f"AND day = LPAD(CAST(day({KST_YESTERDAY}) AS VARCHAR), 2, '0')"
 )
 
 # ─── 색상 팔레트 ───
