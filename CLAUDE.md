@@ -41,6 +41,7 @@ terraform/          - Terraform 루트 모듈 + 11개 서브모듈
     athena-query/   - Athena 쿼리 결과 조회 Lambda
     agent-ui/       - AgentCore UI 호스팅 인프라
     auth/           - Cognito SSO + Lambda@Edge 인증
+    openreplay/   - OpenReplay 세션 리플레이 (CF → ALB → EC2 + RDS + Redis + S3)
 lambda/             - Python Lambda 함수
   authorizer/       - JWT/API Key 검증 Lambda Authorizer
   ingest/           - HTTP → Firehose 브리지
@@ -194,6 +195,7 @@ terraform/          - Terraform root module + 11 submodules
     athena-query/   - Athena query result retrieval Lambda
     agent-ui/       - AgentCore UI hosting infrastructure
     auth/           - Cognito SSO + Lambda@Edge authentication
+    openreplay/   - OpenReplay session replay (CF → ALB → EC2 + RDS + Redis + S3)
 lambda/             - Python Lambda functions
   authorizer/       - JWT/API Key validation Lambda Authorizer
   ingest/           - HTTP → Firehose bridge

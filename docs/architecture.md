@@ -57,6 +57,12 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
   - `web-app/` — 별도 배포 가능한 Next.js 앱.
 - **terraform/modules/agent-ui/** — AgentCore UI 호스팅 인프라.
 
+### Session Replay
+- **terraform/modules/openreplay/** — OpenReplay 셀프호스팅 인프라. CF → ALB → EC2 (Docker Compose).
+  - EC2에서 Kafka, 프론트엔드, 백엔드 컨테이너 실행.
+  - RDS PostgreSQL, ElastiCache Redis, S3 녹화 버킷을 외부 관리형으로 사용.
+  - `/ingest/*` 경로로 트래커 데이터 수집 (인증 없음), `/*` 대시보드 (SSO).
+
 ### Traffic Simulation
 - **simulator/** — TypeScript 트래픽 생성기. 실제 브라우저 SDK 호출 시뮬레이션. Docker 컨테이너화.
 
@@ -319,6 +325,12 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
   - `web/` — Next.js 14 Web UI (agent chat interface).
   - `web-app/` — Independently deployable Next.js app.
 - **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure.
+
+### Session Replay
+- **terraform/modules/openreplay/** — Self-hosted OpenReplay infrastructure. CF → ALB → EC2 (Docker Compose).
+  - Runs Kafka, frontend, backend containers on EC2.
+  - Uses RDS PostgreSQL, ElastiCache Redis, S3 recording bucket as external managed services.
+  - `/ingest/*` path for tracker data collection (no auth), `/*` dashboard (SSO).
 
 ### Traffic Simulation
 - **simulator/** — TypeScript traffic generator. Simulates actual browser SDK calls. Dockerized.
