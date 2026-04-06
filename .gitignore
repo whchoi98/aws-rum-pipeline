@@ -15,6 +15,7 @@ coverage/
 cdk.out/
 .env
 .env.*
+!.env.example
 *.local.json
 settings.local.json
 datadog_img/
