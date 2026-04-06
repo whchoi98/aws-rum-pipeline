@@ -46,6 +46,20 @@ resource "aws_ssm_parameter" "db_password" {
   tags = var.tags
 }
 
+# JWT 시크릿 자동 생성
+resource "random_password" "jwt_secret" {
+  length  = 64
+  special = false
+}
+
+resource "aws_ssm_parameter" "jwt_secret" {
+  name  = "/rum-pipeline/${var.environment}/openreplay/jwt-secret"
+  type  = "SecureString"
+  value = random_password.jwt_secret.result
+
+  tags = var.tags
+}
+
 # RDS PostgreSQL 16 인스턴스
 resource "aws_db_instance" "openreplay" {
   identifier     = "${var.project_name}-openreplay"

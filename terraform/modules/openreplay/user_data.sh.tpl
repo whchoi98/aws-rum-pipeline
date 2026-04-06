@@ -32,22 +32,13 @@ DB_PASSWORD=$(aws ssm get-parameter \
   --query 'Parameter.Value' \
   --output text)
 
-# 3. JWT 시크릿 읽기/생성 (최초 실행 시 생성)
+# 3. JWT 시크릿 읽기 (Terraform이 SSM에 미리 생성)
 JWT_SECRET=$(aws ssm get-parameter \
   --name "/rum-pipeline/$${ENVIRONMENT}/openreplay/jwt-secret" \
   --with-decryption \
   --region "$${REGION}" \
   --query 'Parameter.Value' \
-  --output text 2>/dev/null || true)
-
-if [ -z "$${JWT_SECRET}" ]; then
-  JWT_SECRET=$(openssl rand -hex 32)
-  aws ssm put-parameter \
-    --name "/rum-pipeline/$${ENVIRONMENT}/openreplay/jwt-secret" \
-    --type SecureString \
-    --value "$${JWT_SECRET}" \
-    --region "$${REGION}"
-fi
+  --output text)
 
 # 4. OpenReplay 리포지토리 클론
 cd /opt

@@ -128,20 +128,21 @@ module "athena_query" {
 
 # -----------------------------------------------------------------------------
 # Auth — Cognito User Pool + SSO + Lambda@Edge
+# TODO: auth 모듈은 provider 충돌 해결 후 활성화 (us-east-1 required)
 # -----------------------------------------------------------------------------
 
-module "auth" {
-  source            = "./modules/auth"
-  project_name      = var.project_name
-  cloudfront_domain = module.agent_ui.cloudfront_domain
-  sso_metadata_url  = var.sso_metadata_url
-  lambda_source_dir = "${path.module}/../lambda/edge-auth"
-  tags              = { Component = "auth" }
-
-  providers = {
-    aws.us_east_1 = aws.us_east_1
-  }
-}
+# module "auth" {
+#   source            = "./modules/auth"
+#   project_name      = var.project_name
+#   cloudfront_domain = module.agent_ui.cloudfront_domain
+#   sso_metadata_url  = var.sso_metadata_url
+#   lambda_source_dir = "${path.module}/../lambda/edge-auth"
+#   tags              = { Component = "auth" }
+#
+#   providers = {
+#     aws.us_east_1 = aws.us_east_1
+#   }
+# }
 
 # -----------------------------------------------------------------------------
 # Agent UI — CloudFront + ALB + EC2 (Next.js)
@@ -154,7 +155,7 @@ module "agent_ui" {
   public_subnet_ids       = var.public_subnet_ids
   instance_type           = "t4g.large"
   agentcore_endpoint_arn  = var.agentcore_endpoint_arn
-  edge_auth_qualified_arn = module.auth.edge_auth_qualified_arn
+  edge_auth_qualified_arn = "" # auth 모듈 미배포 시 빈 문자열
   tags                    = { Component = "agent-ui" }
 }
 
@@ -172,6 +173,6 @@ module "openreplay" {
   public_subnet_ids       = var.public_subnet_ids
   private_subnet_ids      = var.private_subnet_ids
   instance_type           = "m7g.xlarge"
-  edge_auth_qualified_arn = module.auth.edge_auth_qualified_arn
+  edge_auth_qualified_arn = "" # auth 모듈 미배포 시 빈 문자열
   tags                    = { Component = "session-replay" }
 }
