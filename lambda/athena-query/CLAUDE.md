@@ -14,6 +14,7 @@ Athena SQL 쿼리를 실행하고 결과를 반환하는 Lambda -- AgentCore RUM
 | 파일 | 역할 |
 |------|------|
 | `handler.py` | SQL 안전성 검증, Athena 쿼리 실행, 결과 파싱 및 반환 |
+| `test_handler.py` | pytest 테스트 (SQL 차단/SELECT/SHOW/DESCRIBE/MCP 형식/에러/빈 결과) |
 
 ### Environment Variables
 | 변수 | 용도 | 기본값 |
@@ -34,7 +35,7 @@ cd lambda/athena-query && python3 -m pytest test_handler.py -v
 - 오류 시 `{"error": "메시지"}` 반환 (Exception을 raise하지 않음)
 - 첫 번째 행을 컬럼 헤더로 사용하여 딕셔너리 리스트로 변환
 - IAM: `athena:StartQueryExecution`, `athena:GetQueryExecution`, `athena:GetQueryResults` 권한 필요
-- 테스트 파일 없음 -- boto3 mock으로 테스트 추가 권장
+- boto3 mock 기반 pytest 테스트 10개 포함
 
 <p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
 
@@ -49,6 +50,7 @@ Executes Athena SQL queries and returns results -- used as a tool by the AgentCo
 | File | Role |
 |------|------|
 | `handler.py` | SQL safety validation, Athena query execution, result parsing and return |
+| `test_handler.py` | pytest tests (SQL blocking/SELECT/SHOW/DESCRIBE/MCP format/error/empty result) |
 
 ### Environment Variables
 | Variable | Purpose | Default |
@@ -69,6 +71,6 @@ cd lambda/athena-query && python3 -m pytest test_handler.py -v
 - Errors return `{"error": "message"}` (does not raise exceptions)
 - First row is used as column headers, data is converted to a list of dictionaries
 - IAM: requires `athena:StartQueryExecution`, `athena:GetQueryExecution`, `athena:GetQueryResults` permissions
-- No test file present -- adding boto3-mocked tests is recommended
+- Includes 10 boto3-mocked pytest tests
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>

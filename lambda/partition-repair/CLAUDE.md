@@ -14,6 +14,7 @@ Athena에서 `MSCK REPAIR TABLE`을 실행하여 Glue 카탈로그에 새 S3 파
 | 파일 | 역할 |
 |------|------|
 | `handler.py` | Athena MSCK REPAIR TABLE 실행 및 완료 대기 (최대 60초 폴링) |
+| `test_handler.py` | pytest 테스트 (성공/실패/취소/폴링 검증) |
 
 ### Environment Variables
 | 변수 | 용도 |
@@ -34,7 +35,7 @@ cd lambda/partition-repair && python3 -m pytest test_handler.py -v
 - 쿼리 실패 시 `StateChangeReason`을 로그에 기록 후 Exception raise
 - IAM: `athena:StartQueryExecution`, `athena:GetQueryExecution` 권한 필요
 - Athena 워크그룹에 결과 출력 위치(S3)가 사전 설정되어 있어야 함
-- 테스트 파일 없음 -- boto3 mock으로 테스트 추가 권장
+- boto3 mock 기반 pytest 테스트 5개 포함
 
 <p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
 
@@ -49,6 +50,7 @@ Scheduled Lambda that runs `MSCK REPAIR TABLE` via Athena to auto-register new S
 | File | Role |
 |------|------|
 | `handler.py` | Executes Athena MSCK REPAIR TABLE and polls for completion (max 60s) |
+| `test_handler.py` | pytest tests (success/failure/cancel/polling verification) |
 
 ### Environment Variables
 | Variable | Purpose |
@@ -69,6 +71,6 @@ cd lambda/partition-repair && python3 -m pytest test_handler.py -v
 - Logs `StateChangeReason` on failure before raising Exception
 - IAM: requires `athena:StartQueryExecution`, `athena:GetQueryExecution` permissions
 - Athena workgroup must have an output location (S3) pre-configured
-- No test file present -- adding boto3-mocked tests is recommended
+- Includes 5 boto3-mocked pytest tests
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>

@@ -83,8 +83,8 @@ cd terraform && terraform apply
 cd lambda/authorizer && python3 -m pytest test_handler.py -v
 cd lambda/ingest && python3 -m pytest test_handler.py -v
 cd lambda/transform && python3 -m pytest test_handler.py -v
-cd lambda/partition-repair && python3 -m pytest test_handler.py -v  # TODO: 테스트 미작성
-cd lambda/athena-query && python3 -m pytest test_handler.py -v      # TODO: 테스트 미작성
+cd lambda/partition-repair && python3 -m pytest test_handler.py -v
+cd lambda/athena-query && python3 -m pytest test_handler.py -v
 
 # SDK 테스트
 cd sdk && npm test           # vitest
@@ -236,8 +236,8 @@ cd terraform && terraform apply
 cd lambda/authorizer && python3 -m pytest test_handler.py -v
 cd lambda/ingest && python3 -m pytest test_handler.py -v
 cd lambda/transform && python3 -m pytest test_handler.py -v
-cd lambda/partition-repair && python3 -m pytest test_handler.py -v  # TODO: 테스트 미작성
-cd lambda/athena-query && python3 -m pytest test_handler.py -v      # TODO: 테스트 미작성
+cd lambda/partition-repair && python3 -m pytest test_handler.py -v
+cd lambda/athena-query && python3 -m pytest test_handler.py -v
 
 # SDK tests
 cd sdk && npm test           # vitest
