@@ -13,7 +13,7 @@ Accepted
 ## Context
 RUM Pipeline 인프라는 Terraform (HCL)으로 관리 중.
 CDK 사용 팀이 동일한 인프라를 TypeScript로 관리할 수 있도록 CDK 버전을 추가 제공할 필요가 있음.
-Terraform 10개 모듈과 1:1 대응하는 CDK Construct를 작성하여 선택적 사용 가능하게 함.
+Terraform 11개 모듈과 1:1 대응하는 CDK Construct를 작성하여 선택적 사용 가능하게 함.
 
 ## Decision
 - `cdk/` 디렉터리에 AWS CDK (TypeScript) 프로젝트 추가
@@ -39,7 +39,7 @@ Accepted
 ## Context
 The RUM Pipeline infrastructure is currently managed with Terraform (HCL).
 There is a need to provide an additional CDK version so that teams using CDK can manage the same infrastructure in TypeScript.
-CDK Constructs will be written in a 1:1 correspondence with the 10 Terraform modules, allowing teams to choose either approach.
+CDK Constructs will be written in a 1:1 correspondence with the 11 Terraform modules, allowing teams to choose either approach.
 
 ## Decision
 - Add an AWS CDK (TypeScript) project under the `cdk/` directory

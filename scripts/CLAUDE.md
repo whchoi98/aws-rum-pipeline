@@ -18,6 +18,7 @@
 | `provision-grafana.sh` | Grafana 워크스페이스 데이터소스/대시보드 프로비저닝 |
 | `setup-agentcore.sh` | AgentCore 환경 설정 (scripts/ 에 위치) |
 | `deploy-unified-dashboard.py` | 통합 Grafana 대시보드 배포 (scripts/ 에 위치) |
+| `install-hooks.sh` | Git 훅 설치 (commit-msg, Claude 훅 권한) |
 
 ### Key Commands
 ```bash
@@ -50,6 +51,7 @@ A collection of shell scripts for building, deploying, provisioning, and testing
 | `provision-grafana.sh` | Grafana workspace datasource/dashboard provisioning |
 | `setup-agentcore.sh` | AgentCore environment setup (located in scripts/) |
 | `deploy-unified-dashboard.py` | Unified Grafana dashboard deployment (located in scripts/) |
+| `install-hooks.sh` | Git hooks installer (commit-msg, Claude hook permissions) |
 
 ### Key Commands
 ```bash

@@ -16,8 +16,7 @@ Next.js 14 Web UI를 통해 사용자와 채팅 인터페이스 제공.
 - `agent.py` — 에이전트 메인. Strands Agent + MCP 도구 연결
 - `requirements.txt` — Python 의존성 (strands-agents, boto3 등)
 - `streamable_http_sigv4.py` — SigV4 인증 HTTP 클라이언트 유틸리티
-- `web/` — Next.js 14 Web UI (에이전트 채팅 인터페이스)
-- `web-app/` — 별도 배포 가능한 Next.js 앱
+- `web-app/` — Next.js 14 Web UI (에이전트 채팅 인터페이스, 메인 앱)
 - `Dockerfile` — 에이전트 컨테이너 이미지
 - `scripts/setup-agentcore.sh` — AgentCore 환경 설정 스크립트 (프로젝트 루트 `scripts/` 에 위치)
 
@@ -28,7 +27,7 @@ pip install -r requirements.txt
 python3 agent.py
 
 # Web UI 개발
-cd web && npm install && npm run dev
+cd web-app && npm install && npm run dev
 
 # 컨테이너 빌드
 docker build -t rum-agentcore .
@@ -56,8 +55,7 @@ Provides a chat interface for users through a Next.js 14 Web UI.
 - `agent.py` — Agent main entry. Strands Agent + MCP tool integration
 - `requirements.txt` — Python dependencies (strands-agents, boto3, etc.)
 - `streamable_http_sigv4.py` — SigV4 authenticated HTTP client utility
-- `web/` — Next.js 14 Web UI (agent chat interface)
-- `web-app/` — Separately deployable Next.js app
+- `web-app/` — Next.js 14 Web UI (agent chat interface, main app)
 - `Dockerfile` — Agent container image
 - `scripts/setup-agentcore.sh` — AgentCore environment setup script (located in project root `scripts/`)
 
@@ -68,7 +66,7 @@ pip install -r requirements.txt
 python3 agent.py
 
 # Web UI development
-cd web && npm install && npm run dev
+cd web-app && npm install && npm run dev
 
 # Container build
 docker build -t rum-agentcore .
