@@ -43,3 +43,13 @@ output "athena_workgroup" {
   description = "Athena workgroup name for RUM queries"
   value       = module.grafana.athena_workgroup
 }
+
+output "openreplay_cloudfront_domain" {
+  description = "OpenReplay dashboard URL"
+  value       = var.enable_openreplay ? module.openreplay[0].cloudfront_domain : null
+}
+
+output "openreplay_ingest_endpoint" {
+  description = "OpenReplay tracker ingest endpoint"
+  value       = var.enable_openreplay ? module.openreplay[0].ingest_endpoint : null
+}

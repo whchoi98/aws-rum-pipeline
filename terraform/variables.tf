@@ -43,3 +43,15 @@ variable "allowed_origins" {
   type        = list(string)
   default     = ["*"]
 }
+
+variable "private_subnet_ids" {
+  description = "Private subnet IDs for RDS and ElastiCache (OpenReplay)"
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_openreplay" {
+  description = "OpenReplay 세션 리플레이 활성화 여부"
+  type        = bool
+  default     = false
+}

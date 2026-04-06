@@ -11,12 +11,14 @@ import { PartitionRepair } from './constructs/partition-repair';
 import { AthenaQuery } from './constructs/athena-query';
 import { AgentUi } from './constructs/agent-ui';
 import { Auth } from './constructs/auth';
+import { OpenReplay } from './constructs/openreplay';
 
 export interface RumPipelineStackProps extends cdk.StackProps {
   projectName: string;
   environment: string;
   vpcId?: string;
   publicSubnetIds?: string[];
+  privateSubnetIds?: string[];
   agentcoreEndpointArn?: string;
   allowedOrigins?: string[];
   ssoMetadataUrl?: string;
@@ -129,6 +131,23 @@ export class RumPipelineStack extends cdk.Stack {
       // CloudFront에 Lambda@Edge 연결은 AgentUi props로 전달
       // 참고: 순환 의존성 때문에 CDK에서는 두 번째 배포에서 연결
       // 또는 agentUi에 직접 edgeAuthFunction 전달
+
+      // ─── 11. OpenReplay Session Replay (선택) ───
+      const privateSubnetIds = this.node.tryGetContext('privateSubnetIds') as string[] | undefined;
+      if (privateSubnetIds) {
+        const openReplay = new OpenReplay(this, 'OpenReplay', {
+          projectName,
+          environment: envName,
+          vpcId,
+          publicSubnetIds,
+          privateSubnetIds,
+        });
+
+        new cdk.CfnOutput(this, 'OpenReplayDashboard', {
+          value: `https://${openReplay.cloudfrontDomain}`,
+          description: 'OpenReplay Session Replay 대시보드',
+        });
+      }
     }
 
     // ─── Outputs ───
