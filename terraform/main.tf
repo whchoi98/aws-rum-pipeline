@@ -157,3 +157,21 @@ module "agent_ui" {
   edge_auth_qualified_arn = module.auth.edge_auth_qualified_arn
   tags                    = { Component = "agent-ui" }
 }
+
+# -----------------------------------------------------------------------------
+# Session Replay — OpenReplay (CloudFront + ALB + EC2 + RDS + ElastiCache + S3)
+# -----------------------------------------------------------------------------
+
+module "openreplay" {
+  count  = var.enable_openreplay ? 1 : 0
+  source = "./modules/openreplay"
+
+  project_name            = var.project_name
+  environment             = var.environment
+  vpc_id                  = var.vpc_id
+  public_subnet_ids       = var.public_subnet_ids
+  private_subnet_ids      = var.private_subnet_ids
+  instance_type           = "m7g.xlarge"
+  edge_auth_qualified_arn = module.auth.edge_auth_qualified_arn
+  tags                    = { Component = "session-replay" }
+}
