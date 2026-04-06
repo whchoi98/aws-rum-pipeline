@@ -24,7 +24,7 @@ variable "private_subnet_ids" {
 
 variable "instance_type" {
   type    = string
-  default = "m7g.xlarge"
+  default = "m7i.xlarge" # x86_64 — OpenReplay Docker 이미지가 amd64만 지원
 }
 
 variable "db_instance_class" {

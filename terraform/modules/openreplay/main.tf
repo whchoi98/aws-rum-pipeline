@@ -10,19 +10,19 @@ data "aws_ec2_managed_prefix_list" "cloudfront" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }
 
-# 최신 Amazon Linux 2023 ARM64 AMI
-data "aws_ami" "al2023_arm" {
+# 최신 Amazon Linux 2023 x86_64 AMI (OpenReplay Docker 이미지가 amd64만 지원)
+data "aws_ami" "al2023_x86" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-arm64"]
+    values = ["al2023-ami-*-x86_64"]
   }
 
   filter {
     name   = "architecture"
-    values = ["arm64"]
+    values = ["x86_64"]
   }
 }
 
@@ -156,7 +156,7 @@ resource "aws_iam_instance_profile" "ec2" {
 # --- EC2 Instance ---
 
 resource "aws_instance" "openreplay" {
-  ami                    = data.aws_ami.al2023_arm.id
+  ami                    = data.aws_ami.al2023_x86.id
   instance_type          = var.instance_type
   subnet_id              = var.public_subnet_ids[0]
   vpc_security_group_ids = [aws_security_group.ec2.id]

@@ -172,7 +172,7 @@ module "openreplay" {
   vpc_id                  = var.vpc_id
   public_subnet_ids       = var.public_subnet_ids
   private_subnet_ids      = var.private_subnet_ids
-  instance_type           = "m7g.xlarge"
-  edge_auth_qualified_arn = "" # auth 모듈 미배포 시 빈 문자열
+  instance_type           = "m7i.xlarge" # x86_64 — OpenReplay Docker amd64 only
+  edge_auth_qualified_arn = ""           # auth 모듈 미배포 시 빈 문자열
   tags                    = { Component = "session-replay" }
 }

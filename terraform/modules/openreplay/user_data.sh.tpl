@@ -20,11 +20,11 @@ systemctl start docker
 # Docker Compose v2 플러그인 설치
 mkdir -p /usr/local/lib/docker/cli-plugins
 COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name')
-curl -SL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-aarch64" \
+curl -SL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# 2. SSM에서 DB 비밀번호 읽기
+# 2. SSM에서 시크릿 읽기 (Terraform이 미리 생성)
 DB_PASSWORD=$(aws ssm get-parameter \
   --name "/rum-pipeline/$${ENVIRONMENT}/openreplay/db-password" \
   --with-decryption \
@@ -32,7 +32,6 @@ DB_PASSWORD=$(aws ssm get-parameter \
   --query 'Parameter.Value' \
   --output text)
 
-# 3. JWT 시크릿 읽기 (Terraform이 SSM에 미리 생성)
 JWT_SECRET=$(aws ssm get-parameter \
   --name "/rum-pipeline/$${ENVIRONMENT}/openreplay/jwt-secret" \
   --with-decryption \
@@ -40,12 +39,34 @@ JWT_SECRET=$(aws ssm get-parameter \
   --query 'Parameter.Value' \
   --output text)
 
-# 4. OpenReplay 리포지토리 클론
+# 3. OpenReplay 리포지토리 클론
 cd /opt
 git clone https://github.com/openreplay/openreplay.git
-cd openreplay
+cd openreplay/scripts/docker-compose
 
-# 5. docker-compose.override.yml — 외부 서비스 사용 시 내장 컨테이너 비활성화
+# 4. .env — Docker Compose 변수 치환용 (따옴표 없이)
+cat > .env << ENV
+COMMON_VERSION=v1.23.0
+COMMON_PROTOCOL=https
+COMMON_DOMAIN_NAME=localhost
+COMMON_JWT_SECRET=$${JWT_SECRET}
+COMMON_JWT_SPOT_SECRET=$${JWT_SECRET}
+COMMON_S3_KEY=
+COMMON_S3_SECRET=
+COMMON_PG_PASSWORD=$${DB_PASSWORD}
+COMMON_JWT_REFRESH_SECRET=$${JWT_SECRET}-refresh
+COMMON_JWT_SPOT_REFRESH_SECRET=$${JWT_SECRET}-spot-refresh
+COMMON_ASSIST_JWT_SECRET=$${JWT_SECRET}-assist
+COMMON_ASSIST_KEY=$${JWT_SECRET}-assist-key
+COMMON_TOKEN_SECRET=$${JWT_SECRET}-token
+POSTGRES_VERSION=17
+REDIS_VERSION=8
+MINIO_VERSION=2025
+CLICKHOUSE_VERSION=25.11-alpine
+ENV
+cp .env common.env
+
+# 5. docker-compose.override.yml — 외부 서비스로 교체
 cat > docker-compose.override.yml << 'OVERRIDE'
 services:
   postgresql:
@@ -56,30 +77,20 @@ services:
     profiles: ["disabled"]
 OVERRIDE
 
-# 6. .env 파일 — 외부 서비스 엔드포인트 설정
-cat > .env << ENV
-# OpenReplay 환경 변수 (외부 서비스)
-ENVIRONMENT=$${ENVIRONMENT}
-AWS_REGION=$${REGION}
-
-# PostgreSQL (RDS)
-POSTGRES_HOST=$${RDS_ENDPOINT}
-POSTGRES_PORT=5432
-POSTGRES_DB=openreplay
-POSTGRES_USER=openreplay
-POSTGRES_PASSWORD=$${DB_PASSWORD}
-
-# Redis (ElastiCache)
-REDIS_HOST=$${REDIS_ENDPOINT}
-REDIS_PORT=6379
-
-# S3 (세션 녹화 저장)
+# 6. DB 관련 환경변수 오버라이드 (docker-envs/db.env)
+cat > docker-envs/db.env << DBENV
+pg_host=$${RDS_ENDPOINT}
+pg_port=5432
+pg_dbname=openreplay
+pg_user=openreplay
+pg_password=$${DB_PASSWORD}
+REDIS_STRING=redis://$${REDIS_ENDPOINT}:6379
+S3_HOST=s3.amazonaws.com
+S3_KEY=
+S3_SECRET=
 S3_BUCKET=$${S3_BUCKET}
-S3_REGION=$${REGION}
-
-# JWT 시크릿
-JWT_SECRET=$${JWT_SECRET}
-ENV
+AWS_DEFAULT_REGION=$${REGION}
+DBENV
 
 # 7. Docker Compose 기동
 docker compose up -d
