@@ -18,6 +18,115 @@ const QUICK_QUESTIONS = [
   { label: '🌐 브라우저별', text: '가장 많은 에러가 발생하는 브라우저는?' },
 ];
 
+// ─── 다운로드 유틸리티 ─────────────────────────────────────────────────────────
+function downloadBlob(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function getTimestamp() {
+  return new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '');
+}
+
+function downloadMarkdown(content: string) {
+  downloadBlob(`rum-analysis-${getTimestamp()}.md`, content, 'text/markdown;charset=utf-8');
+}
+
+function downloadWord(content: string) {
+  const html = [
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">',
+    '<head><meta charset="utf-8"><title>RUM Analysis</title>',
+    '<style>',
+    '  body { font-family: "Malgun Gothic", sans-serif; font-size: 11pt; line-height: 1.6; color: #1a1a1a; }',
+    '  table { border-collapse: collapse; width: 100%; margin: 8px 0; }',
+    '  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; }',
+    '  th { background: #f6f8fa; font-weight: 600; }',
+    '  pre { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; font-size: 10pt; white-space: pre-wrap; }',
+    '</style></head>',
+    '<body><h1>RUM 분석 리포트</h1>',
+    '<p style="color:#666; font-size:9pt;">',
+    `생성: ${new Date().toLocaleString('ko-KR')} | 모델: Claude Sonnet 4.6 | DB: rum_pipeline_db`,
+    '</p><hr><pre>',
+    content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+    '</pre></body></html>',
+  ].join('\n');
+  downloadBlob(`rum-analysis-${getTimestamp()}.doc`, html, 'application/msword;charset=utf-8');
+}
+
+function downloadPdf(content: string) {
+  // 인쇄 다이얼로그를 통한 PDF 저장 (DOM API만 사용, textContent로 XSS 방지)
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  const doc = printWindow.document;
+  const meta = doc.createElement('meta');
+  meta.setAttribute('charset', 'utf-8');
+  doc.head.appendChild(meta);
+  doc.title = 'RUM Analysis Report';
+  const style = doc.createElement('style');
+  style.textContent = [
+    'body { font-family: "Malgun Gothic", -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }',
+    'h1 { font-size: 16pt; border-bottom: 2px solid #1f6feb; padding-bottom: 4px; }',
+    'pre { white-space: pre-wrap; font-size: 10pt; line-height: 1.6; }',
+    'p.meta { color: #666; font-size: 9pt; }',
+    '@media print { body { padding: 0; } }',
+  ].join('\n');
+  doc.head.appendChild(style);
+  const h1 = doc.createElement('h1');
+  h1.textContent = 'RUM 분석 리포트';
+  doc.body.appendChild(h1);
+  const info = doc.createElement('p');
+  info.className = 'meta';
+  info.textContent = `생성: ${new Date().toLocaleString('ko-KR')} | 모델: Claude Sonnet 4.6 | DB: rum_pipeline_db`;
+  doc.body.appendChild(info);
+  doc.body.appendChild(doc.createElement('hr'));
+  const pre = doc.createElement('pre');
+  pre.textContent = content;
+  doc.body.appendChild(pre);
+  setTimeout(() => { printWindow.print(); }, 300);
+}
+
+// ─── 다운로드 버튼 컴포넌트 ──────────────────────────────────────────────────
+function DownloadMenu({ content }: { content: string }) {
+  const [open, setOpen] = useState(false);
+
+  if (!content || content.startsWith('\u26A0')) return null;
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block', marginTop: '8px' }}>
+      <button style={dlStyles.toggle} onClick={() => setOpen(!open)}>
+        {'📥 다운로드 '}{open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <div style={dlStyles.menu}>
+          <button style={dlStyles.item} onClick={() => { downloadMarkdown(content); setOpen(false); }}>
+            {'📝 Markdown (.md)'}
+          </button>
+          <button style={dlStyles.item} onClick={() => { downloadPdf(content); setOpen(false); }}>
+            {'📄 PDF (인쇄)'}
+          </button>
+          <button style={dlStyles.item} onClick={() => { downloadWord(content); setOpen(false); }}>
+            {'📃 Word (.doc)'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const dlStyles: Record<string, React.CSSProperties> = {
+  toggle: { background: '#21262d', border: '1px solid #30363d', color: '#8b949e', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' },
+  menu: { position: 'absolute', bottom: '100%', left: 0, marginBottom: '4px', background: '#161b22', border: '1px solid #30363d', borderRadius: '8px', padding: '4px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '160px' },
+  item: { background: 'none', border: 'none', color: '#c9d1d9', padding: '8px 12px', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px', whiteSpace: 'nowrap' },
+};
+
+// ─── 메인 컴포넌트 ──────────────────────────────────────────────────────────
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -54,7 +163,7 @@ export default function Home() {
 
       if (!res.ok) {
         const errorText = await res.text().catch(() => res.statusText);
-        setMessages((prev) => [...prev, { role: 'bot', content: `⚠️ 서버 오류 (${res.status}): ${errorText}` }]);
+        setMessages((prev) => [...prev, { role: 'bot', content: `\u26A0\uFE0F 서버 오류 (${res.status}): ${errorText}` }]);
         setStreaming('');
         setLoading(false);
         return;
@@ -72,14 +181,12 @@ export default function Home() {
 
           buffer += decoder.decode(value, { stream: true });
 
-          // SSE 이벤트는 빈 줄(\n\n)로 구분됨
           const events = buffer.split('\n\n');
-          buffer = events.pop() || ''; // 마지막 미완성 이벤트는 버퍼에 보관
+          buffer = events.pop() || '';
 
           for (const event of events) {
             const lines = event.split('\n');
             for (const line of lines) {
-              // SSE 주석 (heartbeat 등) 무시
               if (line.startsWith(':')) continue;
               if (!line.startsWith('data: ')) continue;
               try {
@@ -88,11 +195,11 @@ export default function Home() {
                   accumulated += data.content;
                   setStreaming(accumulated);
                 } else if (data.type === 'error') {
-                  accumulated += `\n\n⚠️ 오류: ${data.content}`;
+                  accumulated += `\n\n\u26A0\uFE0F 오류: ${data.content}`;
                   setStreaming(accumulated);
                 }
               } catch {
-                // JSON 파싱 실패 — 무시
+                // JSON 파싱 실패
               }
             }
           }
@@ -104,7 +211,7 @@ export default function Home() {
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: 'bot', content: `⚠️ 연결 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}` },
+        { role: 'bot', content: `\u26A0\uFE0F 연결 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}` },
       ]);
       setStreaming('');
     }
@@ -114,31 +221,39 @@ export default function Home() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>RUM 분석 에이전트</h1>
-        <span style={styles.badge}>AgentCore</span>
-        <span style={styles.badge2}>Claude Sonnet</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h1 style={styles.title}>RUM 분석 에이전트</h1>
+          <span style={styles.poweredBy}>Powered by Amazon Bedrock AgentCore</span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+          <span style={styles.badge}>Agentic AI</span>
+          <span style={styles.badge2}>Claude Sonnet 4.6</span>
+        </div>
       </header>
 
       <div ref={chatRef} style={styles.chatArea}>
         {messages.map((msg, i) => (
           <div key={i} style={{ ...styles.message, flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
             <div style={{ ...styles.avatar, background: msg.role === 'bot' ? '#1f6feb' : '#238636' }}>
-              {msg.role === 'bot' ? '🤖' : '👤'}
+              {msg.role === 'bot' ? '\uD83E\uDD16' : '\uD83D\uDC64'}
             </div>
-            <div style={msg.role === 'user' ? styles.userBubble : styles.botBubble}>
-              {msg.role === 'bot' ? (
-                <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                </div>
-              ) : (
-                msg.content
-              )}
+            <div style={{ maxWidth: msg.role === 'user' ? '75%' : '80%' }}>
+              <div style={msg.role === 'user' ? styles.userBubble : styles.botBubble}>
+                {msg.role === 'bot' ? (
+                  <div className="markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  msg.content
+                )}
+              </div>
+              {msg.role === 'bot' && i > 0 && <DownloadMenu content={msg.content} />}
             </div>
           </div>
         ))}
         {streaming && (
           <div style={styles.message}>
-            <div style={{ ...styles.avatar, background: '#1f6feb' }}>🤖</div>
+            <div style={{ ...styles.avatar, background: '#1f6feb' }}>{'\uD83E\uDD16'}</div>
             <div style={styles.botBubble}>
               <div className="markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{streaming}</ReactMarkdown>
@@ -148,7 +263,7 @@ export default function Home() {
         )}
         {loading && !streaming && (
           <div style={styles.message}>
-            <div style={{ ...styles.avatar, background: '#1f6feb' }}>🤖</div>
+            <div style={{ ...styles.avatar, background: '#1f6feb' }}>{'\uD83E\uDD16'}</div>
             <div style={styles.botBubble}>분석 중...</div>
           </div>
         )}
@@ -185,7 +300,7 @@ export default function Home() {
           ))}
         </div>
         <div style={styles.statusBar}>
-          <span>모델: Claude Sonnet</span>
+          <span>모델: Claude Sonnet 4.6</span>
           <span>DB: rum_pipeline_db</span>
           <span>리전: ap-northeast-2</span>
           <span>세션: {sessionId.slice(-8)}</span>
@@ -204,6 +319,7 @@ export default function Home() {
         .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: #f0f6fc; margin: 12px 0 8px; }
         .markdown-body ul, .markdown-body ol { padding-left: 20px; margin: 4px 0; }
         .markdown-body p { margin: 4px 0; }
+        button:hover { opacity: 0.85; }
       `}</style>
     </div>
   );
@@ -211,15 +327,16 @@ export default function Home() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0d1117', color: '#c9d1d9', fontFamily: '-apple-system, sans-serif' },
-  header: { background: '#161b22', borderBottom: '1px solid #30363d', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' },
+  header: { background: '#161b22', borderBottom: '1px solid #30363d', padding: '16px 24px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' },
   title: { fontSize: '18px', fontWeight: 600, color: '#f0f6fc', margin: 0 },
-  badge: { background: '#238636', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px' },
-  badge2: { background: '#1f6feb', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px' },
+  poweredBy: { fontSize: '11px', color: '#8b949e', fontStyle: 'italic' },
+  badge: { background: '#238636', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 500 },
+  badge2: { background: '#1f6feb', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 500 },
   chatArea: { flex: 1, overflow: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '900px', width: '100%', margin: '0 auto' },
   message: { display: 'flex', gap: '12px' },
   avatar: { width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 },
-  botBubble: { maxWidth: '80%', padding: '12px 16px', borderRadius: '12px', background: '#161b22', border: '1px solid #30363d', fontSize: '14px' },
-  userBubble: { maxWidth: '75%', padding: '12px 16px', borderRadius: '12px', background: '#1f6feb', color: '#fff', fontSize: '14px', whiteSpace: 'pre-wrap' as const },
+  botBubble: { padding: '12px 16px', borderRadius: '12px', background: '#161b22', border: '1px solid #30363d', fontSize: '14px' },
+  userBubble: { padding: '12px 16px', borderRadius: '12px', background: '#1f6feb', color: '#fff', fontSize: '14px', whiteSpace: 'pre-wrap' as const },
   inputArea: { padding: '16px', borderTop: '1px solid #30363d', maxWidth: '900px', width: '100%', margin: '0 auto' },
   inputWrapper: { display: 'flex', gap: '8px', background: '#161b22', border: '1px solid #30363d', borderRadius: '12px', padding: '8px 12px' },
   textarea: { flex: 1, background: 'none', border: 'none', color: '#c9d1d9', fontSize: '14px', fontFamily: 'inherit', resize: 'none' as const, outline: 'none', lineHeight: 1.5 },
