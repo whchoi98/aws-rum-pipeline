@@ -1,9 +1,0 @@
-{"type":"server-started","port":64696,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:64696","screen_dir":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content","state_dir":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/state"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/approaches.html"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/architecture-overview.html"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/architecture-no-opensearch.html"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/detail-sdk-layer.html"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/detail-pipeline.html"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/detail-aggregation-dashboard.html"}
-{"type":"screen-added","file":"/home/ec2-user/my-project/rum/.superpowers/brainstorm/841246-1775042368/content/waiting.html"}
-{"type":"server-stopped","reason":"owner process exited"}
