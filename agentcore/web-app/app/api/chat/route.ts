@@ -259,7 +259,8 @@ export async function POST(request: NextRequest) {
         send({ type: 'chunk', content: '\uD83D\uDCCA 데이터를 조회하고 있습니다...\n\n' });
         let results = '';
         for (const tag of t1) {
-          send({ type: 'chunk', content: tag.type === 'SQL' ? `\`\`\`sql\n${tag.content}\n\`\`\`\n\n` : `\uD83D\uDD27 ${tag.type}\n\n` });
+          const toolLabel = { SQL:'\uD83D\uDCCA Athena', CWLOGS:'\uD83D\uDCCB CW Logs', METRICS:'\uD83D\uDCC8 Metrics', ALARM:'\uD83D\uDD14 Alarms', GLUE:'\uD83D\uDDC2 Glue', GRAFANA:'\uD83D\uDCCA Grafana', SNS:'\uD83D\uDCE8 SNS' }[tag.type] || tag.type;
+          send({ type: 'chunk', content: `${toolLabel} 조회 중...\n\n` });
           startHb(); const { label, result } = await runTool(tag, sessionId); stopHb();
           try {
             const p = JSON.parse(result);
