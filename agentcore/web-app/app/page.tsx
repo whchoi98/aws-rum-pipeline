@@ -39,29 +39,51 @@ function downloadMarkdown(content: string) {
   downloadBlob(`rum-analysis-${getTimestamp()}.md`, content, 'text/markdown;charset=utf-8');
 }
 
-function downloadWord(content: string) {
-  const html = [
-    '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">',
-    '<head><meta charset="utf-8"><title>RUM Analysis</title>',
-    '<style>',
-    '  body { font-family: "Malgun Gothic", sans-serif; font-size: 11pt; line-height: 1.6; color: #1a1a1a; }',
-    '  table { border-collapse: collapse; width: 100%; margin: 8px 0; }',
-    '  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; }',
-    '  th { background: #f6f8fa; font-weight: 600; }',
-    '  pre { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; font-size: 10pt; white-space: pre-wrap; }',
-    '</style></head>',
-    '<body><h1>RUM 분석 리포트</h1>',
-    '<p style="color:#666; font-size:9pt;">',
-    `생성: ${new Date().toLocaleString('ko-KR')} | 모델: Claude Sonnet 4.6 | DB: rum_pipeline_db`,
-    '</p><hr><pre>',
-    content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
-    '</pre></body></html>',
-  ].join('\n');
-  downloadBlob(`rum-analysis-${getTimestamp()}.doc`, html, 'application/msword;charset=utf-8');
-}
+function downloadRendered(msgId: string, mode: 'pdf' | 'word') {
+  // 렌더링된 마크다운 DOM을 복제하여 PDF/Word로 출력
+  const source = document.getElementById(msgId);
+  if (!source) return;
 
-function downloadPdf(content: string) {
-  // 인쇄 다이얼로그를 통한 PDF 저장 (DOM API만 사용, textContent로 XSS 방지)
+  const PRINT_STYLES = [
+    'body { font-family: "Malgun Gothic", -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #1a1a1a; }',
+    'h1 { font-size: 16pt; border-bottom: 2px solid #1f6feb; padding-bottom: 4px; }',
+    'h2 { font-size: 14pt; color: #1f6feb; }',
+    'h3 { font-size: 12pt; }',
+    'table { border-collapse: collapse; width: 100%; margin: 8px 0; }',
+    'th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; font-size: 10pt; }',
+    'th { background: #f6f8fa; font-weight: 600; }',
+    'pre { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; overflow-x: auto; font-size: 9pt; white-space: pre-wrap; }',
+    'code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-size: 9pt; }',
+    'pre code { background: none; padding: 0; }',
+    'strong { color: #1a1a1a; }',
+    'ul, ol { padding-left: 20px; }',
+    'p { margin: 4px 0; line-height: 1.6; }',
+    '@media print { body { padding: 0; } }',
+  ].join('\n');
+
+  const cloned = source.cloneNode(true) as HTMLElement;
+  // 다크 테마 인라인 색상 제거 → 인쇄용 밝은 테마
+  cloned.querySelectorAll('*').forEach(el => {
+    (el as HTMLElement).style.color = '';
+    (el as HTMLElement).style.background = '';
+    (el as HTMLElement).style.backgroundColor = '';
+  });
+
+  if (mode === 'word') {
+    const html = [
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">',
+      '<head><meta charset="utf-8"><style>' + PRINT_STYLES + '</style></head><body>',
+      '<h1>RUM 분석 리포트</h1>',
+      '<p style="color:#666;font-size:9pt;">',
+      `생성: ${new Date().toLocaleString('ko-KR')} | 모델: Claude Sonnet 4.6</p><hr>`,
+      cloned.outerHTML,
+      '</body></html>',
+    ].join('\n');
+    downloadBlob(`rum-analysis-${getTimestamp()}.doc`, html, 'application/msword;charset=utf-8');
+    return;
+  }
+
+  // PDF: 인쇄 다이얼로그
   const printWindow = window.open('', '_blank');
   if (!printWindow) return;
   const doc = printWindow.document;
@@ -70,30 +92,22 @@ function downloadPdf(content: string) {
   doc.head.appendChild(meta);
   doc.title = 'RUM Analysis Report';
   const style = doc.createElement('style');
-  style.textContent = [
-    'body { font-family: "Malgun Gothic", -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }',
-    'h1 { font-size: 16pt; border-bottom: 2px solid #1f6feb; padding-bottom: 4px; }',
-    'pre { white-space: pre-wrap; font-size: 10pt; line-height: 1.6; }',
-    'p.meta { color: #666; font-size: 9pt; }',
-    '@media print { body { padding: 0; } }',
-  ].join('\n');
+  style.textContent = PRINT_STYLES;
   doc.head.appendChild(style);
   const h1 = doc.createElement('h1');
   h1.textContent = 'RUM 분석 리포트';
   doc.body.appendChild(h1);
   const info = doc.createElement('p');
-  info.className = 'meta';
+  info.style.cssText = 'color:#666;font-size:9pt;';
   info.textContent = `생성: ${new Date().toLocaleString('ko-KR')} | 모델: Claude Sonnet 4.6 | DB: rum_pipeline_db`;
   doc.body.appendChild(info);
   doc.body.appendChild(doc.createElement('hr'));
-  const pre = doc.createElement('pre');
-  pre.textContent = content;
-  doc.body.appendChild(pre);
+  doc.body.appendChild(cloned);
   setTimeout(() => { printWindow.print(); }, 300);
 }
 
 // ─── 다운로드 버튼 컴포넌트 ──────────────────────────────────────────────────
-function DownloadMenu({ content }: { content: string }) {
+function DownloadMenu({ content, msgId }: { content: string; msgId: string }) {
   const [open, setOpen] = useState(false);
 
   if (!content || content.startsWith('\u26A0')) return null;
@@ -108,11 +122,11 @@ function DownloadMenu({ content }: { content: string }) {
           <button style={dlStyles.item} onClick={() => { downloadMarkdown(content); setOpen(false); }}>
             {'📝 Markdown (.md)'}
           </button>
-          <button style={dlStyles.item} onClick={() => { downloadPdf(content); setOpen(false); }}>
-            {'📄 PDF (인쇄)'}
+          <button style={dlStyles.item} onClick={() => { downloadRendered(msgId, 'pdf'); setOpen(false); }}>
+            {'📄 PDF (렌더링)'}
           </button>
-          <button style={dlStyles.item} onClick={() => { downloadWord(content); setOpen(false); }}>
-            {'📃 Word (.doc)'}
+          <button style={dlStyles.item} onClick={() => { downloadRendered(msgId, 'word'); setOpen(false); }}>
+            {'📃 Word (렌더링)'}
           </button>
         </div>
       )}
@@ -240,14 +254,14 @@ export default function Home() {
             <div style={{ maxWidth: msg.role === 'user' ? '75%' : '80%' }}>
               <div style={msg.role === 'user' ? styles.userBubble : styles.botBubble}>
                 {msg.role === 'bot' ? (
-                  <div className="markdown-body">
+                  <div className="markdown-body" id={`bot-msg-${i}`}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                   </div>
                 ) : (
                   msg.content
                 )}
               </div>
-              {msg.role === 'bot' && i > 0 && <DownloadMenu content={msg.content} />}
+              {msg.role === 'bot' && i > 0 && <DownloadMenu content={msg.content} msgId={`bot-msg-${i}`} />}
             </div>
           </div>
         ))}
