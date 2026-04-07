@@ -59,6 +59,9 @@ resource "aws_security_group" "ec2" {
   tags = merge(var.tags, { Name = "${var.project_name}-agent-ec2-sg" })
 }
 
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
 # --- IAM Role for EC2 ---
 
 resource "aws_iam_role" "ec2" {
@@ -79,11 +82,57 @@ resource "aws_iam_role_policy" "ec2_agentcore" {
   role = aws_iam_role.ec2.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["bedrock-agentcore:*", "bedrock:*"]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Sid      = "BedrockAgentCore"
+        Effect   = "Allow"
+        Action   = ["bedrock-agentcore:*", "bedrock:*"]
+        Resource = "*"
+      },
+      {
+        Sid    = "LambdaInvoke"
+        Effect = "Allow"
+        Action = ["lambda:InvokeFunction"]
+        Resource = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-*"
+      },
+      {
+        Sid    = "CloudWatchRead"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:ListMetrics",
+          "cloudwatch:DescribeAlarms"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogsRead"
+        Effect = "Allow"
+        Action = [
+          "logs:FilterLogEvents",
+          "logs:GetLogEvents",
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}-*"
+      },
+      {
+        Sid    = "GlueRead"
+        Effect = "Allow"
+        Action = ["glue:GetTable", "glue:GetTables", "glue:GetDatabase"]
+        Resource = [
+          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:catalog",
+          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:database/*",
+          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/*"
+        ]
+      },
+      {
+        Sid      = "SNSPublish"
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = "arn:aws:sns:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      }
+    ]
   })
 }
 
