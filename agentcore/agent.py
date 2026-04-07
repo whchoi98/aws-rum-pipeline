@@ -149,7 +149,7 @@ def create_gateway_transport(gateway_url: str):
 def create_agent(session_id: str = "default") -> Agent:
     """Create Strands agent with MCP Gateway tools or direct Lambda fallback."""
     tools = []
-    model_id = f"{REGION}.anthropic.claude-sonnet-4-6-20250627-v1:0"
+    model_id = "global.anthropic.claude-sonnet-4-6"
 
     if GATEWAY_URL:
         logger.info(f"Connecting to Gateway: {GATEWAY_URL}")
