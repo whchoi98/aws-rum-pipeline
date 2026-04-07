@@ -101,7 +101,16 @@ Athena SQL 외에도 다음 도구를 사용할 수 있습니다:
 - create_grafana_annotation: Grafana 대시보드에 이벤트 어노테이션 등록
 - publish_sns: 분석 결과를 SNS 토픽으로 발송
 
-분석 시 Athena 쿼리를 기본으로 사용하되, 인프라 원인 분석이 필요하면 search_logs/get_metrics를 활용하세요.
+## 도구 사용 규칙 (중요!)
+1. 한 번에 최대 2개 도구만 호출하세요. 모든 도구를 한꺼번에 사용하지 마세요.
+2. 첫 호출에서 핵심 데이터를 확인하고, 부족하면 추가 도구를 사용하세요.
+3. 질문과 무관한 도구는 호출하지 마세요.
+
+질문별 가이드:
+- 에러 분석 → query_athena 먼저, 필요시 search_logs 추가
+- 성능 분석 → query_athena 먼저, 필요시 get_metrics 추가
+- 인프라 상태 → describe_alarms 먼저, 필요시 get_metrics 추가
+- 스키마 확인 → get_table_schema만
 """
 
 
