@@ -35,8 +35,19 @@ function getTimestamp() {
   return new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '');
 }
 
+function stripStatusLines(text: string): string {
+  const STATUS_PATTERNS = ['조회 중', '분석 중', '조회 완료', '추가 조회', '리포트를 생성중', 'Athena', 'CW Logs', 'Metrics', 'Alarms', 'Glue', 'Grafana', 'SNS'];
+  return text.split('\n').filter(line => {
+    const t = line.trim();
+    if (!t) return true;
+    if (t === '---') return false;
+    if (t.length < 50 && STATUS_PATTERNS.some(p => t.includes(p)) && (t.includes('...') || t.includes('완료'))) return false;
+    return true;
+  }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function downloadMarkdown(content: string) {
-  downloadBlob(`rum-analysis-${getTimestamp()}.md`, content, 'text/markdown;charset=utf-8');
+  downloadBlob(`rum-analysis-${getTimestamp()}.md`, stripStatusLines(content), 'text/markdown;charset=utf-8');
 }
 
 function downloadRendered(msgId: string, mode: 'pdf' | 'word') {
@@ -62,7 +73,14 @@ function downloadRendered(msgId: string, mode: 'pdf' | 'word') {
   ].join('\n');
 
   const cloned = source.cloneNode(true) as HTMLElement;
-  // 다크 테마 인라인 색상 제거 → 인쇄용 밝은 테마
+  // 상태 메시지 DOM 요소 제거 + 다크 테마 색상 제거
+  const STATUS_KW = ['조회 중', '분석 중', '조회 완료', '추가 조회', '리포트를 생성중'];
+  cloned.querySelectorAll('p').forEach(p => {
+    const t = (p.textContent || '').trim();
+    if (t.length < 50 && STATUS_KW.some(k => t.includes(k))) p.remove();
+    else if (t.length < 50 && (t.includes('완료') || t.includes('...'))) p.remove();
+  });
+  cloned.querySelectorAll('hr').forEach(hr => hr.remove());
   cloned.querySelectorAll('*').forEach(el => {
     (el as HTMLElement).style.color = '';
     (el as HTMLElement).style.background = '';
