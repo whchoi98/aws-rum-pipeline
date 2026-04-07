@@ -52,7 +52,7 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore 기반 RUM 분석 에이전트.
-  - `agent.py` — Strands Agent + MCP 도구 연결. Athena 쿼리, 이상 감지, 리포트 생성.
+  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8개 도구: Athena SQL, CW Logs/Metrics/Alarms, S3 Select, Glue, Grafana API, SNS.
   - `web/` — 간단한 HTML 프로토타입 (레거시).
   - `web-app/` — Next.js 14 Web UI (메인 채팅 인터페이스).
 - **terraform/modules/agent-ui/** — AgentCore UI 호스팅 인프라.
@@ -325,7 +325,7 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore-based RUM analysis agent.
-  - `agent.py` — Strands Agent + MCP tool integration. Athena queries, anomaly detection, report generation.
+  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8 tools: Athena SQL, CW Logs/Metrics/Alarms, S3 Select, Glue, Grafana API, SNS.
   - `web/` — Simple HTML prototype (legacy).
   - `web-app/` — Next.js 14 Web UI (main chat interface).
 - **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure.

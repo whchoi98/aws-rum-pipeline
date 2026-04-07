@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error recovery sections for all 3 commands and 4 skills
 - Claude Code harness section in onboarding documentation (KR/EN)
 - SSE heartbeat (15s interval) in Agent UI chat route for long-running AI analysis
+- AgentCore 7 analysis tools: CloudWatch Logs/Metrics/Alarms, S3 Select, Glue Catalog, Grafana API, SNS Publish
+- Agent UI tag-based multi-tool system (`<SQL>`, `<CWLOGS>`, `<METRICS>`, `<ALARM>`, `<GLUE>`, `<GRAFANA>`, `<SNS>`)
+- Agent UI header: "Powered by Amazon Bedrock AgentCore" + Agentic AI badge + Claude Sonnet 4.6
+- Agent UI download menu: rendered PDF/Word with status message filtering + Markdown export
+- EC2 IAM role: CloudWatch, Glue, SNS, Lambda invoke permissions for analysis tools
+- Athena/Trino SQL rules: forbidden function mapping (COUNTIF→COUNT_IF, IFNULL→COALESCE, etc.)
+- Tool call rate limiting: max 2 tools per round to prevent slow responses
 
 ### Fixed
 
@@ -182,6 +189,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 3개 명령 + 4개 스킬에 에러 복구 섹션 추가
 - 온보딩 문서에 Claude Code 하네스 섹션 추가 (KR/EN)
 - Agent UI 채팅 라우트에 SSE heartbeat (15초 간격) 추가
+- AgentCore 7개 분석 도구: CloudWatch Logs/Metrics/Alarms, S3 Select, Glue Catalog, Grafana API, SNS Publish
+- Agent UI 태그 기반 멀티 도구 시스템 (`<SQL>`, `<CWLOGS>`, `<METRICS>`, `<ALARM>`, `<GLUE>`, `<GRAFANA>`, `<SNS>`)
+- Agent UI 헤더: "Powered by Amazon Bedrock AgentCore" + Agentic AI 배지 + Claude Sonnet 4.6
+- Agent UI 다운로드 메뉴: 렌더링 PDF/Word (상태 메시지 필터링) + Markdown 내보내기
+- EC2 IAM 역할: CloudWatch, Glue, SNS, Lambda 호출 권한 추가
+- Athena/Trino SQL 규칙: 금지 함수 매핑 (COUNTIF→COUNT_IF, IFNULL→COALESCE 등)
+- 도구 호출 제한: 라운드당 최대 2개로 응답 속도 개선
 
 ### Fixed
 

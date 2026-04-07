@@ -8,12 +8,24 @@
 ## AgentCore Module
 
 ### Role
-Bedrock AgentCore 기반 RUM 분석 에이전트.
-Athena를 통해 RUM 데이터를 쿼리하고, 이상 감지, 성능 분석, 리포트 생성.
-Next.js 14 Web UI를 통해 사용자와 채팅 인터페이스 제공.
+Bedrock AgentCore 기반 RUM 분석 에이전트 (Claude Sonnet 4.6).
+8개 도구로 RUM 데이터, 인프라 로그/메트릭, 알람을 종합 분석.
+Next.js 14 Web UI를 통해 채팅 인터페이스 + 리포트 다운로드 제공.
+
+### 분석 도구 (8개)
+| 도구 | 태그 | 역할 |
+|------|------|------|
+| Athena SQL | `<SQL>` | RUM 이벤트 쿼리 (기본) |
+| CloudWatch Logs | `<CWLOGS>` | Lambda 에러 로그 검색 |
+| CloudWatch Metrics | `<METRICS>` | 인프라 성능 메트릭 |
+| CloudWatch Alarms | `<ALARM>` | 알람 상태 점검 |
+| S3 Select | (agent.py) | raw 이벤트 직접 조회 |
+| Glue Catalog | `<GLUE>` | 테이블 스키마 확인 |
+| Grafana API | `<GRAFANA>` | 대시보드 어노테이션 |
+| SNS Publish | `<SNS>` | 분석 리포트 발송 |
 
 ### Key Files
-- `agent.py` — 에이전트 메인. Strands Agent + MCP 도구 연결
+- `agent.py` — 에이전트 메인. Strands Agent + 8개 boto3 도구 + MCP Gateway
 - `requirements.txt` — Python 의존성 (strands-agents, boto3 등)
 - `streamable_http_sigv4.py` — SigV4 인증 HTTP 클라이언트 유틸리티
 - `web-app/` — Next.js 14 Web UI (에이전트 채팅 인터페이스, 메인 앱)
@@ -47,12 +59,24 @@ docker build -t rum-agentcore .
 ## AgentCore Module
 
 ### Role
-A RUM analytics agent powered by Bedrock AgentCore.
-Queries RUM data via Athena for anomaly detection, performance analysis, and report generation.
-Provides a chat interface for users through a Next.js 14 Web UI.
+A RUM analytics agent powered by Bedrock AgentCore (Claude Sonnet 4.6).
+8 tools for comprehensive analysis: RUM data, infra logs/metrics, alarms.
+Provides a chat interface with report download via Next.js 14 Web UI.
+
+### Analysis Tools (8)
+| Tool | Tag | Purpose |
+|------|-----|---------|
+| Athena SQL | `<SQL>` | RUM event queries (primary) |
+| CloudWatch Logs | `<CWLOGS>` | Lambda error log search |
+| CloudWatch Metrics | `<METRICS>` | Infrastructure performance |
+| CloudWatch Alarms | `<ALARM>` | Alarm status check |
+| S3 Select | (agent.py) | Direct raw event queries |
+| Glue Catalog | `<GLUE>` | Table schema lookup |
+| Grafana API | `<GRAFANA>` | Dashboard annotations |
+| SNS Publish | `<SNS>` | Report distribution |
 
 ### Key Files
-- `agent.py` — Agent main entry. Strands Agent + MCP tool integration
+- `agent.py` — Agent main entry. Strands Agent + 8 boto3 tools + MCP Gateway
 - `requirements.txt` — Python dependencies (strands-agents, boto3, etc.)
 - `streamable_http_sigv4.py` — SigV4 authenticated HTTP client utility
 - `web-app/` — Next.js 14 Web UI (agent chat interface, main app)
