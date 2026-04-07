@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
 
       try {
         send({ type: 'start' });
-        send({ type: 'chunk', content: '\uD83D\uDD0D 질문을 분석하고 있습니다...\n\n' });
+        send({ type: 'chunk', content: '\uD83D\uDD0D 분석 중... 리포트를 생성중입니다.\n\n' });
         const msgs: Array<{role: string; content: string}> = [{ role: 'user', content: prompt }];
 
         startHb(); const r1 = await callBedrock(msgs); stopHb();
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
         let results = '';
         for (const tag of t1) {
           const toolLabel = { SQL:'\uD83D\uDCCA Athena', CWLOGS:'\uD83D\uDCCB CW Logs', METRICS:'\uD83D\uDCC8 Metrics', ALARM:'\uD83D\uDD14 Alarms', GLUE:'\uD83D\uDDC2 Glue', GRAFANA:'\uD83D\uDCCA Grafana', SNS:'\uD83D\uDCE8 SNS' }[tag.type] || tag.type;
-          send({ type: 'chunk', content: `${toolLabel} 조회 중...\n\n` });
+          send({ type: 'chunk', content: `${toolLabel} 분석 중... 리포트를 생성중입니다.\n\n` });
           startHb(); const { label, result } = await runTool(tag, sessionId); stopHb();
           try {
             const p = JSON.parse(result);
@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
         msgs.push({ role: 'user', content: `도구 결과입니다. 분석해주세요. 추가 필요시 도구 태그 사용.\n\n${results}` });
 
         for (let rd = 2; rd <= 4; rd++) {
-          send({ type: 'chunk', content: '\uD83E\uDD16 분석 중...\n\n---\n\n' });
+          send({ type: 'chunk', content: '\uD83E\uDD16 분석 중... 리포트를 생성중입니다.\n\n---\n\n' });
           startHb(); const rr = await callBedrock(msgs); stopHb();
           const mt = extractToolTags(rr);
 
