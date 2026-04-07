@@ -55,6 +55,14 @@ const SYSTEM_PROMPT = `당신은 RUM (Real User Monitoring) 데이터 분석 전
 - 오늘: year='2026', month='04', day='07'
 - JSON: json_extract_scalar(payload, '$.value')
 - event_name 소문자: 'lcp', 'cls', 'inp'
+- iOS/Android 구분: WHERE platform = 'ios' 또는 platform = 'android' (파티션 컬럼 사용)
+- Athena(Trino) 엔진이므로 다음 함수는 사용 금지:
+  - COUNTIF() → COUNT_IF() 또는 SUM(CASE WHEN ... THEN 1 ELSE 0 END) 사용
+  - SAFE_DIVIDE() → TRY(a/b) 또는 CASE WHEN b=0 THEN 0 ELSE a/b END 사용
+  - DATE_TRUNC('day', timestamp) → date_trunc('day', from_unixtime(timestamp/1000))
+  - GROUP_CONCAT() → array_join(array_agg(...), ',')
+  - IFNULL() → COALESCE()
+  - IF(cond, a, b) → CASE WHEN cond THEN a ELSE b END
 
 ## 스키마
 - session_id, user_id, device_id, timestamp(bigint ms), app_version
