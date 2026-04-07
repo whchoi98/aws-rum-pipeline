@@ -8,4 +8,5 @@
 - Simulator 변경 시: `cd simulator && npm test` 실행한다.
 - CDK 변경 시: `cd cdk && npx cdk synth` 실행하여 CloudFormation 생성을 검증한다.
 - 쉘 스크립트 변경 시: `bash -n <script>` 로 문법을 검증한다.
+- 하네스 검증: `bash tests/run-all.sh` (79개 테스트).
 - E2E 통합 테스트: `bash scripts/test-ingestion.sh "<api-endpoint>" "<api-key>"` 실행한다.

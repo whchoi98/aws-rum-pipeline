@@ -20,3 +20,5 @@
 - 새 Terraform 모듈이나 Lambda 함수 추가 시 해당 디렉토리에 문서를 작성한다.
 - 아키텍처 변경 시 `docs/architecture.md`를 업데이트한다.
 - 운영 절차 정의 시 `docs/runbooks/NN-title.md`를 작성한다.
+- 커밋 메시지는 Conventional Commits 형식을 따른다 (feat:, fix:, docs:, chore:, refactor:, test:).
+- Terraform 리소스 네이밍은 `{projectName}-{component}` 형식을 따른다.

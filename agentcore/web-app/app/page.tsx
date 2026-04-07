@@ -52,31 +52,48 @@ export default function Home() {
         body: JSON.stringify({ prompt: message, sessionId }),
       });
 
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => res.statusText);
+        setMessages((prev) => [...prev, { role: 'bot', content: `⚠️ 서버 오류 (${res.status}): ${errorText}` }]);
+        setStreaming('');
+        setLoading(false);
+        return;
+      }
+
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let accumulated = '';
+      let buffer = '';
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const text = decoder.decode(value, { stream: true });
-          const lines = text.split('\n');
+          buffer += decoder.decode(value, { stream: true });
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.type === 'chunk') {
-                accumulated += data.content;
-                setStreaming(accumulated);
-              } else if (data.type === 'error') {
-                accumulated = `⚠️ 오류: ${data.content}`;
-                setStreaming(accumulated);
+          // SSE 이벤트는 빈 줄(\n\n)로 구분됨
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || ''; // 마지막 미완성 이벤트는 버퍼에 보관
+
+          for (const event of events) {
+            const lines = event.split('\n');
+            for (const line of lines) {
+              // SSE 주석 (heartbeat 등) 무시
+              if (line.startsWith(':')) continue;
+              if (!line.startsWith('data: ')) continue;
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'chunk') {
+                  accumulated += data.content;
+                  setStreaming(accumulated);
+                } else if (data.type === 'error') {
+                  accumulated += `\n\n⚠️ 오류: ${data.content}`;
+                  setStreaming(accumulated);
+                }
+              } catch {
+                // JSON 파싱 실패 — 무시
               }
-            } catch {
-              // ignore parse errors
             }
           }
         }

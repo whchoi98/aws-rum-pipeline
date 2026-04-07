@@ -25,7 +25,14 @@ $ARGUMENTS에 따라 배포 방식 결정:
 ```bash
 cd terraform && terraform fmt -recursive
 cd terraform && terraform plan -out=tfplan
-# 사용자 확인 후:
+```
+
+> **STOP** — plan 출력을 사용자에게 보여주세요.
+> 사용자가 "apply", "배포", "진행" 등으로 명시적으로 확인하기 전까지
+> 절대 `terraform apply`를 실행하지 마세요.
+
+사용자 확인 후:
+```bash
 cd terraform && terraform apply tfplan
 ```
 
@@ -34,7 +41,13 @@ cd terraform && terraform apply tfplan
 ```bash
 cd cdk && npm install
 cd cdk && npx cdk synth
-# 사용자 확인 후:
+```
+
+> **STOP** — synth 출력을 사용자에게 보여주세요.
+> 사용자가 명시적으로 확인하기 전까지 `cdk deploy`를 실행하지 마세요.
+
+사용자 확인 후:
+```bash
 cd cdk && npx cdk deploy
 ```
 
@@ -51,3 +64,13 @@ cd cdk && npx cdk deploy
 - 사용된 배포 방식
 - 검증 결과
 - 런북이 없으면 생성 제안
+
+## On Failure
+
+| 실패 지점 | 조치 |
+|-----------|------|
+| `terraform plan` 실패 | `terraform validate` 실행 → 에러 수정 → 재시도 |
+| `terraform apply` 실패 | `terraform state list`로 부분 적용 확인 → 런북 03 참조 |
+| `cdk synth` 실패 | TypeScript 컴파일 에러 확인 → `npx tsc --noEmit` 실행 |
+| `cdk deploy` 실패 | `cdk diff`로 드리프트 확인 → CloudFormation 콘솔에서 스택 상태 확인 |
+| 배포 후 검증 실패 | 즉시 롤백하지 말고 CloudWatch 로그 확인 → 런북 07 참조 |

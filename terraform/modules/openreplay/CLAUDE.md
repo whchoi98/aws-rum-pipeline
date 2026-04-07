@@ -16,7 +16,7 @@ RDS PostgreSQL, ElastiCache Redis, S3를 외부 관리형 서비스로 사용.
 |--------|------|
 | `aws_cloudfront_distribution` | HTTPS + SSO 인증 + /ingest 라우팅 |
 | `aws_lb` | ALB — CF Prefix List SG |
-| `aws_instance` | m7g.xlarge — Docker Compose (OpenReplay) |
+| `aws_instance` | m7i.xlarge (x86_64) — Docker Compose (OpenReplay) |
 | `aws_db_instance` | RDS PostgreSQL 16 |
 | `aws_elasticache_cluster` | Redis 7.1 |
 | `aws_s3_bucket` | 세션 녹화 데이터 |
@@ -43,7 +43,7 @@ Uses RDS PostgreSQL, ElastiCache Redis, and S3 as external managed services.
 |----------|------|
 | `aws_cloudfront_distribution` | HTTPS + SSO auth + /ingest routing |
 | `aws_lb` | ALB — CF Prefix List SG |
-| `aws_instance` | m7g.xlarge — Docker Compose (OpenReplay) |
+| `aws_instance` | m7i.xlarge (x86_64) — Docker Compose (OpenReplay) |
 | `aws_db_instance` | RDS PostgreSQL 16 |
 | `aws_elasticache_cluster` | Redis 7.1 |
 | `aws_s3_bucket` | Session recording data |

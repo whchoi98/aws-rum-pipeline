@@ -52,7 +52,7 @@ terraform init
 terraform plan          # 변경사항 확인
 terraform fmt -recursive  # 코드 포맷팅 (필수)
 ```
-- 11개 서브모듈 (`modules/` 하위)
+- 12개 서브모듈 (`modules/` 하위)
 - `dev`/`prod` workspace 또는 tfvars로 환경 분리
 
 #### Lambda (백엔드)
@@ -104,6 +104,36 @@ bash scripts/test-ingestion.sh "https://<api-id>.execute-api.ap-northeast-2.amaz
 - 시크릿은 AWS SSM Parameter Store 사용 (하드코딩 금지)
 - 리전: `ap-northeast-2` (서울) 기본
 - 각 패키지는 독립적 (node_modules, requirements.txt 분리)
+
+### Claude Code 하네스
+
+이 프로젝트는 Claude Code 하네스가 설정되어 있어 자동 훅, 슬래시 명령, 에이전트를 사용할 수 있습니다.
+
+#### 슬래시 명령
+| 명령 | 용도 |
+|------|------|
+| `/review` | 코드 리뷰 (confidence >= 75 이슈만 보고) |
+| `/test-all` | 전체 테스트 스위트 실행 (Lambda + SDK + iOS + Android + CDK) |
+| `/deploy` | Terraform/CDK 인프라 배포 (사용자 확인 필수) |
+
+#### 자동 훅
+| 이벤트 | 동작 |
+|--------|------|
+| SessionStart | 프로젝트 컨텍스트 자동 로딩 (브랜치, 마지막 커밋, 문서 현황) |
+| PreToolUse (Write/Edit) | 시크릿 패턴 스캔 — 감지 시 차단 |
+| PreToolUse (git commit) | 스테이징된 파일 시크릿 스캔 |
+| PostToolUse (Write/Edit) | CLAUDE.md 누락 경고 |
+
+#### 에이전트
+| 에이전트 | 용도 |
+|----------|------|
+| `code-reviewer` | 코드 변경 리뷰 (sonnet, 읽기 전용) |
+| `security-auditor` | 보안 감사 (sonnet, 읽기 전용 + audit 명령) |
+
+#### 하네스 검증
+```bash
+bash tests/run-all.sh   # TAP 스타일 하네스 테스트
+```
 
 ---
 
@@ -158,7 +188,7 @@ terraform init
 terraform plan          # Review changes
 terraform fmt -recursive  # Format code (required)
 ```
-- 11 submodules under `modules/`
+- 12 submodules under `modules/`
 - Environment separation via `dev`/`prod` workspace or tfvars
 
 #### Lambda (Backend)
@@ -210,5 +240,35 @@ bash scripts/test-ingestion.sh "https://<api-id>.execute-api.ap-northeast-2.amaz
 - Secrets via AWS SSM Parameter Store (no hardcoding)
 - Region: `ap-northeast-2` (Seoul) default
 - Each package is independent (separate node_modules, requirements.txt)
+
+### Claude Code Harness
+
+This project has a Claude Code harness with automated hooks, slash commands, and agents.
+
+#### Slash Commands
+| Command | Purpose |
+|---------|---------|
+| `/review` | Code review (reports only confidence >= 75 issues) |
+| `/test-all` | Run full test suite (Lambda + SDK + iOS + Android + CDK) |
+| `/deploy` | Deploy infrastructure via Terraform/CDK (requires user confirmation) |
+
+#### Automatic Hooks
+| Event | Behavior |
+|-------|----------|
+| SessionStart | Loads project context (branch, last commit, doc stats) |
+| PreToolUse (Write/Edit) | Secret pattern scan — blocks on detection |
+| PreToolUse (git commit) | Scans staged files for secrets |
+| PostToolUse (Write/Edit) | Warns about missing CLAUDE.md |
+
+#### Agents
+| Agent | Purpose |
+|-------|---------|
+| `code-reviewer` | Code change review (sonnet, read-only tools) |
+| `security-auditor` | Security audit (sonnet, read-only + audit commands) |
+
+#### Harness Validation
+```bash
+bash tests/run-all.sh   # TAP-style harness tests
+```
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>

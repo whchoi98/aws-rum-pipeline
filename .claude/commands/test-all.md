@@ -49,8 +49,22 @@ cd mobile-sdk-android && ./gradlew :rum-sdk:test
 cd cdk && npx cdk synth --quiet
 ```
 
-## Step 7: 결과 보고
+## Step 7: 하네스 검증
+
+```bash
+bash tests/run-all.sh
+```
+
+## Step 8: 결과 보고
 
 - 각 스위트별 통과/실패 수
 - 실패한 테스트의 세부 정보 (파일 경로, 에러 메시지)
 - 실패 원인이 명확한 경우 수정 제안
+
+## On Failure
+
+- 개별 스위트 실패 시 **나머지 스위트는 계속 실행** (전체 현황 파악 우선)
+- 실패한 테스트의 에러 메시지와 스택 트레이스를 보고
+- 수정 제안 시 해당 모듈의 CLAUDE.md 규칙 참조
+- 의존성 문제 (`npm install` / `pip install`) 시 `scripts/setup.sh` 실행 제안
+- CDK synth 실패 시 TypeScript 타입 에러 확인: `cd cdk && npx tsc --noEmit`

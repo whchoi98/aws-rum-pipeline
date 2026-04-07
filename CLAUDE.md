@@ -28,7 +28,7 @@ Bedrock AgentCore 기반 분석 에이전트 포함.
 ### Project Structure
 
 ```
-terraform/          - Terraform 루트 모듈 + 11개 서브모듈
+terraform/          - Terraform 루트 모듈 + 12개 서브모듈
   modules/
     s3-data-lake/   - S3 버킷 (raw/processed/athena-results)
     glue-catalog/   - Glue 데이터베이스 및 테이블 스키마
@@ -55,10 +55,10 @@ mobile-sdk-android/ - Android RUM SDK (Kotlin, Gradle)
 simulator/          - RUM 트래픽 생성기 (Docker)
 agentcore/          - Bedrock AgentCore RUM 분석 에이전트 + Web UI
   agent.py          - 에이전트 메인 (Strands, MCP)
-  web/              - Next.js 14 Web UI
-  web-app/          - 별도 Next.js 앱 (필요시)
+  web/              - 간단한 HTML 프로토타입 (레거시)
+  web-app/          - Next.js 14 Web UI (메인 채팅 인터페이스)
 cdk/                - AWS CDK (TypeScript) — Terraform과 동일 인프라
-  lib/constructs/   - 11개 Construct (Terraform 모듈과 1:1 대응, auth 포함)
+  lib/constructs/   - 12개 Construct (Terraform 모듈과 1:1 대응, auth·openreplay 포함)
   lib/rum-pipeline-stack.ts - 메인 스택
 scripts/            - 빌드/배포/테스트 쉘 스크립트
 docs/               - 아키텍처 문서, ADR, 런북
@@ -182,7 +182,7 @@ Includes an analytics agent powered by Bedrock AgentCore.
 ### Project Structure
 
 ```
-terraform/          - Terraform root module + 11 submodules
+terraform/          - Terraform root module + 12 submodules
   modules/
     s3-data-lake/   - S3 buckets (raw/processed/athena-results)
     glue-catalog/   - Glue database and table schemas
@@ -209,10 +209,10 @@ mobile-sdk-android/ - Android RUM SDK (Kotlin, Gradle)
 simulator/          - RUM traffic generator (Docker)
 agentcore/          - Bedrock AgentCore RUM analytics agent + Web UI
   agent.py          - Agent main entry (Strands, MCP)
-  web/              - Next.js 14 Web UI
-  web-app/          - Separate Next.js app (if needed)
+  web/              - Simple HTML prototype (legacy)
+  web-app/          - Next.js 14 Web UI (main chat interface)
 cdk/                - AWS CDK (TypeScript) — same infrastructure as Terraform
-  lib/constructs/   - 11 Constructs (1:1 mapping with Terraform modules, incl. auth)
+  lib/constructs/   - 12 Constructs (1:1 mapping with Terraform modules, incl. auth & openreplay)
   lib/rum-pipeline-stack.ts - Main stack
 scripts/            - Build/deploy/test shell scripts
 docs/               - Architecture docs, ADRs, runbooks

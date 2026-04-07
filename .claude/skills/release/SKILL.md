@@ -35,5 +35,15 @@ Automate the release process with validation checks.
 - List key changes
 - Show next steps (push tag, terraform apply, etc.)
 
+## On Failure
+
+| 실패 지점 | 조치 |
+|-----------|------|
+| 테스트 실패 | 릴리스 중단, 이슈 수정 후 재시도 |
+| CHANGELOG 편집 충돌 | `git checkout -- CHANGELOG.md` → 수동 편집 |
+| `git tag` 실패 (이미 존재) | `git tag -l "vX.Y.Z"` 확인 → 버전 번호 재결정 |
+| `git push --tags` 실패 | 네트워크 확인 후 재시도, `--force` 사용 금지 |
+| package.json 버전 불일치 | sdk/package.json, simulator/package.json 모두 동일 버전인지 확인 |
+
 ## Usage
 Run with `/release` command

@@ -53,8 +53,8 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore 기반 RUM 분석 에이전트.
   - `agent.py` — Strands Agent + MCP 도구 연결. Athena 쿼리, 이상 감지, 리포트 생성.
-  - `web/` — Next.js 14 Web UI (에이전트 채팅 인터페이스).
-  - `web-app/` — 별도 배포 가능한 Next.js 앱.
+  - `web/` — 간단한 HTML 프로토타입 (레거시).
+  - `web-app/` — Next.js 14 Web UI (메인 채팅 인터페이스).
 - **terraform/modules/agent-ui/** — AgentCore UI 호스팅 인프라.
 
 ### Session Replay
@@ -173,13 +173,13 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 │                                                                                 │
 │  ┌──────────────────────────┐    ┌──────────────────────────┐                   │
 │  │ Terraform (HCL)          │    │ CDK (TypeScript)          │                   │
-│  │ 11개 모듈:               │    │ 11개 Construct:           │                   │
+│  │ 12개 모듈:               │    │ 12개 Construct:           │                   │
 │  │ s3-data-lake, glue,      │    │ S3DataLake, GlueCatalog,  │                   │
 │  │ firehose, api-gateway,   │    │ Firehose, ApiGateway,     │                   │
 │  │ security, monitoring,    │    │ Security, Monitoring,     │                   │
 │  │ grafana, partition-repair│    │ Grafana, PartitionRepair, │                   │
 │  │ athena-query, agent-ui,  │    │ AthenaQuery, AgentUi,     │                   │
-│  │ auth                     │    │ Auth                      │                   │
+│  │ auth, openreplay         │    │ Auth, OpenReplay          │                   │
 │  └──────────────────────────┘    └──────────────────────────┘                   │
 │                                                                                 │
 │  State: S3 + DynamoDB Lock          Lambda 소스 공유 (lambda/)                   │
@@ -236,6 +236,7 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 | athena-query | Lambda | 쿼리 실행 API |
 | agent-ui | CloudFront + ALB + EC2 | AgentCore Web UI 호스팅 |
 | auth | Cognito, Lambda@Edge | SSO 인증 + JWT 검증 |
+| openreplay | CloudFront, ALB, EC2, RDS, ElastiCache, S3 | 세션 리플레이 (셀프호스팅 OpenReplay) |
 
 ### Deployed Resources (ap-northeast-2)
 - API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
@@ -258,6 +259,7 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 | AthenaQuery | athena-query | Athena Query Lambda |
 | AgentUi | agent-ui | CloudFront + ALB + EC2 |
 | Auth | auth | Cognito + SSO + Lambda@Edge |
+| OpenReplay | openreplay | 세션 리플레이 (CF + ALB + EC2 + RDS + Redis + S3) |
 
 CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 
@@ -271,6 +273,8 @@ CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 - Cognito sub 클레임을 session_id로 사용하여 사용자별 AgentCore Memory 분리
 - Grafana 대시보드 날짜 필터를 KST(Asia/Seoul) 기준으로 처리 (UTC 오차 방지)
 - Terraform + CDK 듀얼 IaC로 팀별 선호 도구 선택 가능 (Lambda 소스 공유)
+- OpenReplay 셀프호스팅으로 세션 리플레이 데이터 주권 확보 (SaaS 대비 비용 절감, RDS+Redis+S3 외부 관리형)
+- Agent UI ALB idle_timeout 180초 + SSE heartbeat(15초 간격)로 멀티라운드 AI 분석 타임아웃 방지
 
 <p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
 
@@ -322,8 +326,8 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore-based RUM analysis agent.
   - `agent.py` — Strands Agent + MCP tool integration. Athena queries, anomaly detection, report generation.
-  - `web/` — Next.js 14 Web UI (agent chat interface).
-  - `web-app/` — Independently deployable Next.js app.
+  - `web/` — Simple HTML prototype (legacy).
+  - `web-app/` — Next.js 14 Web UI (main chat interface).
 - **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure.
 
 ### Session Replay
@@ -443,13 +447,13 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 │                                                                                 │
 │  ┌──────────────────────────┐    ┌──────────────────────────┐                   │
 │  │ Terraform (HCL)          │    │ CDK (TypeScript)          │                   │
-│  │ 11 Modules:              │    │ 11 Constructs:            │                   │
+│  │ 12 Modules:              │    │ 12 Constructs:            │                   │
 │  │ s3-data-lake, glue,      │    │ S3DataLake, GlueCatalog,  │                   │
 │  │ firehose, api-gateway,   │    │ Firehose, ApiGateway,     │                   │
 │  │ security, monitoring,    │    │ Security, Monitoring,     │                   │
 │  │ grafana, partition-repair│    │ Grafana, PartitionRepair, │                   │
 │  │ athena-query, agent-ui,  │    │ AthenaQuery, AgentUi,     │                   │
-│  │ auth                     │    │ Auth                      │                   │
+│  │ auth, openreplay         │    │ Auth, OpenReplay          │                   │
 │  └──────────────────────────┘    └──────────────────────────┘                   │
 │                                                                                 │
 │  State: S3 + DynamoDB Lock          Shared Lambda Source (lambda/)              │
@@ -506,6 +510,7 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 | athena-query | Lambda | Query execution API |
 | agent-ui | CloudFront + ALB + EC2 | AgentCore Web UI hosting |
 | auth | Cognito, Lambda@Edge | SSO authentication + JWT validation |
+| openreplay | CloudFront, ALB, EC2, RDS, ElastiCache, S3 | Session replay (self-hosted OpenReplay) |
 
 ### Deployed Resources (ap-northeast-2)
 - API Endpoint: `https://<api-id>.execute-api.ap-northeast-2.amazonaws.com`
@@ -528,6 +533,7 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 | AthenaQuery | athena-query | Athena Query Lambda |
 | AgentUi | agent-ui | CloudFront + ALB + EC2 |
 | Auth | auth | Cognito + SSO + Lambda@Edge |
+| OpenReplay | openreplay | Session replay (CF + ALB + EC2 + RDS + Redis + S3) |
 
 CDK commands: `cd cdk && npx cdk synth / deploy / diff`
 
@@ -541,5 +547,7 @@ CDK commands: `cd cdk && npx cdk synth / deploy / diff`
 - Cognito sub claim used as session_id for per-user AgentCore Memory isolation
 - Grafana dashboard date filters use KST (Asia/Seoul) timezone to prevent UTC offset issues
 - Dual IaC with Terraform + CDK for team tool preference flexibility (shared Lambda source)
+- Self-hosted OpenReplay for session replay data sovereignty (cost savings vs SaaS, RDS+Redis+S3 as external managed services)
+- Agent UI ALB idle_timeout 180s + SSE heartbeat (15s interval) to prevent multi-round AI analysis timeouts
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>

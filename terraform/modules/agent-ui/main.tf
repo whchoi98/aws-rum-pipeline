@@ -140,6 +140,9 @@ resource "aws_lb" "agent" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = var.public_subnet_ids
 
+  # SSE 스트리밍: Bedrock+Athena 멀티라운드 분석 시 최대 3분 소요
+  idle_timeout = 180
+
   tags = merge(var.tags, { Name = "${var.project_name}-agent-alb" })
 }
 
@@ -189,10 +192,12 @@ resource "aws_cloudfront_distribution" "agent" {
     origin_id   = "alb"
 
     custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+      http_port                = 80
+      https_port               = 443
+      origin_protocol_policy   = "http-only"
+      origin_ssl_protocols     = ["TLSv1.2"]
+      origin_read_timeout      = 60
+      origin_keepalive_timeout = 60
     }
   }
 

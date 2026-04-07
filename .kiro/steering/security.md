@@ -1,0 +1,9 @@
+- 파일 쓰기/커밋 시 시크릿 패턴을 자동 감지한다 (AWS Access Key, JWT, Private Key, Slack Token 등).
+- 시크릿이 감지되면 해당 작업을 차단한다.
+- 위험 명령을 차단한다: `rm -rf /`, `git push --force`, `terraform destroy`, `terraform apply -auto-approve`, `chmod 777`.
+- S3 버킷은 퍼블릭 액세스를 차단하고 암호화를 설정한다.
+- IAM 정책에 와일드카드(`*`) 사용을 최소화한다.
+- 보안 그룹에 `0.0.0.0/0` 인바운드를 허용하지 않는다 (필요 시 WAF 사용).
+- CORS `allowed_origins: ["*"]`는 개발 환경에서만 허용하고, 프로덕션에서는 특정 도메인으로 제한한다.
+- Lambda@Edge JWT 검증 우회 가능성을 주기적으로 점검한다.
+- 의존성 보안: `npm audit`, `pip audit`를 정기적으로 실행한다.

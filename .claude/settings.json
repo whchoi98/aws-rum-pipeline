@@ -1,7 +1,26 @@
 {
   "permissions": {
     "allow": [],
-    "deny": []
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf .)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf $HOME)",
+      "Bash(git push --force)",
+      "Bash(git push -f)",
+      "Bash(git push -f origin main)",
+      "Bash(git reset --hard)",
+      "Bash(git clean -f)",
+      "Bash(git clean -fd)",
+      "Bash(git checkout .)",
+      "Bash(git restore .)",
+      "Bash(terraform destroy)",
+      "Bash(npx cdk destroy)",
+      "Bash(terraform apply -auto-approve)",
+      "Bash(eval )",
+      "Bash(chmod 777)"
+    ]
   },
   "hooks": {
     "SessionStart": [
@@ -15,13 +34,22 @@
         ]
       }
     ],
-    "PreCommit": [
+    "PreToolUse": [
       {
-        "matcher": "",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/secret-scan.sh 2>/dev/null || true"
+            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then for f in $(git diff --cached --name-only 2>/dev/null); do bash .claude/hooks/secret-scan.sh \"$f\"; done; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/secret-scan.sh \"$TOOL_INPUT_PATH\" 2>/dev/null"
           }
         ]
       }

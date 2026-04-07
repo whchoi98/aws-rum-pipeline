@@ -1,0 +1,12 @@
+# 거짓양성 (false positive) — secret-scan.sh가 무시해야 하는 패턴
+# 이 파일의 각 줄은 경고를 발생시키지 않아야 합니다.
+
+aws_access_key_id = var.access_key
+password_hash = bcrypt(var.password)
+resource "aws_iam_access_key" "example" {}
+ghp_placeholder = "replace-me"
+timeout = 300
+max_connections = 100
+algorithm = "HS256"
+endpoint = "https://hooks.example.com/services/test"
+token_type = "Bearer"

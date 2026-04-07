@@ -34,5 +34,12 @@ Present the refactoring plan to the user:
 - Verify no behavior changes
 - Check that the refactoring achieved its goal
 
+## On Failure
+
+- 테스트 실패 시 마지막 변경 롤백: `git checkout -- <파일>`
+- 리팩토링 중 의존성 발견 시 Plan 단계로 돌아가 재평가
+- Terraform validate 실패 시 `terraform fmt -recursive` 먼저 실행
+- 타입 에러 시 `npx tsc --noEmit` 으로 전체 타입 체크
+
 ## Usage
 Run with `/refactor` command

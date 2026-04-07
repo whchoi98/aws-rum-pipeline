@@ -40,5 +40,12 @@ Output quality report with grades (A-F) before making changes.
 ### 7. Report
 Output before/after quality scores and list of all changes.
 
+## On Failure
+
+- 파일 읽기 실패 시 해당 파일 건너뛰고 나머지 계속 진행
+- CLAUDE.md 생성 실패 시 누락 목록을 보고하고 수동 생성 안내
+- git log 접근 불가 시 ADR 감사 건너뛰고 나머지 단계 진행
+- 충돌 발생 시 사용자에게 확인 후 덮어쓰기 여부 결정
+
 ## Usage
 Run with `/sync-docs` command

@@ -16,6 +16,11 @@
 | [07](../../docs/runbooks/07-monitoring-alerting.md) | 모니터링/알림 | CloudWatch 알람 설정 |
 | [08](../../docs/runbooks/08-agentcore-setup.md) | AgentCore 설정 | Bedrock AgentCore 환경 구성 |
 | [09](../../docs/runbooks/09-cognito-sso-setup.md) | Cognito SSO 설정 | SSO + Lambda@Edge 인증 구성 |
+| [10](../../docs/runbooks/10-glue-schema-migration.md) | Glue 스키마 마이그레이션 | Glue 테이블 스키마 변경 절차 |
+| [11](../../docs/runbooks/11-disaster-recovery.md) | 재해 복구 | DR 절차 및 복구 |
+| [12](../../docs/runbooks/12-sdk-release-coordination.md) | SDK 릴리스 조율 | Web/iOS/Android SDK 릴리스 |
+| [13](../../docs/runbooks/13-cost-management.md) | 비용 관리 | AWS 비용 최적화 |
+| [14](../../docs/runbooks/14-openreplay-management.md) | OpenReplay 관리 | 세션 리플레이 운영 |
 
 ## 새 런북 작성
 

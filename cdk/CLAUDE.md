@@ -9,7 +9,7 @@
 
 ### Role
 Terraform과 동일한 RUM Pipeline 인프라를 AWS CDK (TypeScript)로 관리.
-11개 Construct가 Terraform 11개 모듈과 1:1 대응.
+12개 Construct가 Terraform 12개 모듈과 1:1 대응.
 
 ### Key Files
 | 파일 | 역할 | Terraform 대응 |
@@ -27,6 +27,7 @@ Terraform과 동일한 RUM Pipeline 인프라를 AWS CDK (TypeScript)로 관리.
 | `lib/constructs/athena-query.ts` | Athena Query Lambda | `modules/athena-query/` |
 | `lib/constructs/agent-ui.ts` | CloudFront + ALB + EC2 | `modules/agent-ui/` |
 | `lib/constructs/auth.ts` | Cognito + SSO + Lambda@Edge | `modules/auth/` |
+| `lib/constructs/openreplay.ts` | 세션 리플레이 (CF + ALB + EC2 + RDS + Redis + S3) | `modules/openreplay/` |
 
 ### Key Commands
 ```bash
@@ -59,7 +60,7 @@ npx cdk deploy \
 
 ### Role
 Manages the same RUM Pipeline infrastructure as Terraform using AWS CDK (TypeScript).
-11 Constructs map 1:1 to the 11 Terraform modules.
+12 Constructs map 1:1 to the 12 Terraform modules.
 
 ### Key Files
 | File | Role | Terraform Equivalent |
@@ -77,6 +78,7 @@ Manages the same RUM Pipeline infrastructure as Terraform using AWS CDK (TypeScr
 | `lib/constructs/athena-query.ts` | Athena Query Lambda | `modules/athena-query/` |
 | `lib/constructs/agent-ui.ts` | CloudFront + ALB + EC2 | `modules/agent-ui/` |
 | `lib/constructs/auth.ts` | Cognito + SSO + Lambda@Edge | `modules/auth/` |
+| `lib/constructs/openreplay.ts` | Session replay (CF + ALB + EC2 + RDS + Redis + S3) | `modules/openreplay/` |
 
 ### Key Commands
 ```bash

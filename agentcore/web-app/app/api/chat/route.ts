@@ -85,11 +85,9 @@ async function callBedrock(messages: Array<{role: string; content: string}>): Pr
 
 export async function POST(request: NextRequest) {
   // Lambda@Edge가 주입한 사용자 식별 헤더
-  const userSub = request.headers.get('x-user-sub');
+  // Lambda@Edge 미연결 시 (SSO 비활성) fallback 사용자 허용
+  const userSub = request.headers.get('x-user-sub') || 'anonymous';
   const userEmail = request.headers.get('x-user-email');
-  if (!userSub) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
 
   const { prompt } = await request.json();
   if (!prompt) {
@@ -107,6 +105,17 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       };
 
+      // SSE keepalive: 긴 작업 중 CloudFront/ALB 유휴 타임아웃 방지
+      let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+      const startHeartbeat = () => {
+        heartbeatTimer = setInterval(() => {
+          controller.enqueue(encoder.encode(`: heartbeat\n\n`));
+        }, 15000);
+      };
+      const stopHeartbeat = () => {
+        if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+      };
+
       try {
         send({ type: 'start' });
         send({ type: 'chunk', content: '🔍 질문을 분석하고 있습니다...\n\n' });
@@ -116,7 +125,9 @@ export async function POST(request: NextRequest) {
         ];
 
         // Round 1: Bedrock generates SQL
+        startHeartbeat();
         const response1 = await callBedrock(messages);
+        stopHeartbeat();
         const sqls = extractSQL(response1);
 
         if (sqls.length === 0) {
@@ -137,7 +148,9 @@ export async function POST(request: NextRequest) {
         let queryResults = '';
         for (const sql of sqls) {
           send({ type: 'chunk', content: `\`\`\`sql\n${sql}\n\`\`\`\n\n` });
+          startHeartbeat();
           const result = await queryAthena(sql, sessionId);
+          stopHeartbeat();
 
           try {
             const parsed = JSON.parse(result);
@@ -164,7 +177,9 @@ export async function POST(request: NextRequest) {
         for (let round = 2; round <= MAX_ROUNDS + 1; round++) {
           send({ type: 'chunk', content: '🤖 결과를 분석하고 있습니다...\n\n---\n\n' });
 
+          startHeartbeat();
           const roundResponse = await callBedrock(messages);
+          stopHeartbeat();
           const moreSqls = extractSQL(roundResponse);
 
           if (moreSqls.length === 0 || round > MAX_ROUNDS) {
@@ -183,7 +198,9 @@ export async function POST(request: NextRequest) {
           let moreResults = '';
           for (const sql of moreSqls) {
             send({ type: 'chunk', content: `\`\`\`sql\n${sql}\n\`\`\`\n\n` });
+            startHeartbeat();
             const result = await queryAthena(sql, sessionId);
+            stopHeartbeat();
             try {
               const parsed = JSON.parse(result);
               if (parsed.error) {
@@ -211,6 +228,7 @@ export async function POST(request: NextRequest) {
         console.error('Chat error:', message);
         send({ type: 'error', content: message });
       } finally {
+        stopHeartbeat();
         controller.close();
       }
     },

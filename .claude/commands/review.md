@@ -31,3 +31,10 @@ allowed-tools: Read, Glob, Grep, Bash(git diff:*), Bash(git log:*)
 
 파일 경로, 라인 번호, 수정 제안과 함께 구조화된 형식으로 결과 제시.
 고신뢰도 이슈가 없으면 코드가 기준을 충족함을 간략히 확인.
+
+## On Failure
+
+- `git diff` 출력이 없으면 staged 변경 확인 (`git diff --cached`)
+- staged 변경도 없으면 "리뷰할 변경사항이 없습니다" 보고 후 종료
+- 파일 읽기 실패 시 해당 파일 건너뛰고 나머지 파일 계속 리뷰
+- 리뷰 기준 참조: `.claude/skills/code-review/SKILL.md`

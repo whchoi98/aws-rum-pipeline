@@ -27,8 +27,9 @@ The pipeline processes approximately 1.8M events/day for 50K DAU at an estimated
 - **Error and Crash Tracking** — JS errors, unhandled exceptions, crashes, and ANR with automatic stack trace collection.
 - **AI-Powered Analysis** — Natural language RUM data analysis via Bedrock Claude Sonnet with auto-generated Athena SQL.
 - **Admin Dashboard** — 43-panel Grafana dashboard across 9 sections with real-time KPIs, CWV gauges, error trends, and session explorer.
-- **Infrastructure as Code** — Dual IaC support with Terraform (11 modules) and AWS CDK (11 constructs).
+- **Infrastructure as Code** — Dual IaC support with Terraform (12 modules) and AWS CDK (12 constructs).
 - **SSO Authentication** — CloudFront + Lambda@Edge + Cognito SSO for Agent UI access control with per-user memory.
+- **Session Replay** — Self-hosted OpenReplay integration via CloudFront + ALB + EC2 with RDS, Redis, and S3 backend.
 
 ## Prerequisites
 
@@ -131,7 +132,7 @@ Set values in `terraform/terraform.tfvars` (see `terraform.tfvars.example`).
 
 ```
 aws-rum-pipeline/
-├── terraform/                    # IaC — Terraform root + 11 modules
+├── terraform/                    # IaC — Terraform root + 12 modules
 │   └── modules/
 │       ├── s3-data-lake/         # S3 buckets + lifecycle policies
 │       ├── glue-catalog/         # Glue DB + 3 table definitions
@@ -143,7 +144,8 @@ aws-rum-pipeline/
 │       ├── partition-repair/     # Glue partition auto-repair (EventBridge)
 │       ├── athena-query/         # Athena SQL execution Lambda
 │       ├── agent-ui/             # CloudFront + ALB + EC2
-│       └── auth/                 # Cognito SSO + Lambda@Edge
+│       ├── auth/                 # Cognito SSO + Lambda@Edge
+│       └── openreplay/           # Session replay (CF + ALB + EC2 + RDS + Redis + S3)
 ├── lambda/                       # Lambda functions (Python 3.12)
 │   ├── authorizer/               # API Key validation (SSM cached)
 │   ├── ingest/                   # HTTP → Firehose forwarding
@@ -158,6 +160,7 @@ aws-rum-pipeline/
 ├── agentcore/                    # Bedrock AgentCore AI agent + Next.js UI
 ├── cdk/                          # AWS CDK (TypeScript) — Terraform alternative
 ├── scripts/                      # Build/deploy/test scripts
+├── tests/                        # Harness validation tests (TAP-style)
 └── docs/                         # Architecture, ADRs, runbooks
 ```
 
@@ -180,6 +183,9 @@ cd mobile-sdk-ios && swift test                                # 11 tests
 
 # Android SDK tests
 cd mobile-sdk-android && ./gradlew :rum-sdk:test               # 8 tests
+
+# Harness validation (hooks, structure, secret patterns)
+bash tests/run-all.sh                                          # 79 tests
 
 # E2E integration test
 ./scripts/test-ingestion.sh <api-endpoint> <api-key>
@@ -222,8 +228,9 @@ DAU 5만 기준 약 180만 이벤트/일을 처리하며, 예상 비용은 월 ~
 - **에러 및 크래시 추적** — JS 에러, 미처리 예외, 크래시, ANR 자동 수집 및 스택 트레이스
 - **AI 기반 분석** — Bedrock Claude Sonnet으로 자연어 RUM 데이터 분석, Athena SQL 자동 생성
 - **관리자 대시보드** — 43개 패널 9개 섹션의 Grafana 대시보드 (실시간 KPI, CWV 게이지, 에러 추이, 세션 탐색기)
-- **Infrastructure as Code** — Terraform(11개 모듈)과 AWS CDK(11개 Construct) 듀얼 IaC 지원
+- **Infrastructure as Code** — Terraform(12개 모듈)과 AWS CDK(12개 Construct) 듀얼 IaC 지원
 - **SSO 인증** — CloudFront + Lambda@Edge + Cognito SSO로 Agent UI 접근 제어 및 사용자별 메모리
+- **세션 리플레이** — CloudFront + ALB + EC2 기반 셀프호스팅 OpenReplay 연동 (RDS, Redis, S3 백엔드)
 
 ## 사전 요구 사항
 
@@ -326,7 +333,7 @@ RumSDK.setUser("user-123")
 
 ```
 aws-rum-pipeline/
-├── terraform/                    # IaC — Terraform 루트 + 11개 모듈
+├── terraform/                    # IaC — Terraform 루트 + 12개 모듈
 │   └── modules/
 │       ├── s3-data-lake/         # S3 버킷 + 라이프사이클 정책
 │       ├── glue-catalog/         # Glue DB + 3개 테이블 정의
@@ -338,7 +345,8 @@ aws-rum-pipeline/
 │       ├── partition-repair/     # Glue 파티션 자동 복구 (EventBridge)
 │       ├── athena-query/         # Athena SQL 실행 Lambda
 │       ├── agent-ui/             # CloudFront + ALB + EC2
-│       └── auth/                 # Cognito SSO + Lambda@Edge
+│       ├── auth/                 # Cognito SSO + Lambda@Edge
+│       └── openreplay/           # 세션 리플레이 (CF + ALB + EC2 + RDS + Redis + S3)
 ├── lambda/                       # Lambda 함수 (Python 3.12)
 │   ├── authorizer/               # API Key 검증 (SSM 캐싱)
 │   ├── ingest/                   # HTTP → Firehose 포워딩
@@ -353,6 +361,7 @@ aws-rum-pipeline/
 ├── agentcore/                    # Bedrock AgentCore AI 에이전트 + Next.js UI
 ├── cdk/                          # AWS CDK (TypeScript) — Terraform 대안
 ├── scripts/                      # 빌드/배포/테스트 스크립트
+├── tests/                        # 하네스 검증 테스트 (TAP 스타일)
 └── docs/                         # 아키텍처, ADR, 런북
 ```
 
@@ -375,6 +384,9 @@ cd mobile-sdk-ios && swift test                                # 11개 테스트
 
 # Android SDK 테스트
 cd mobile-sdk-android && ./gradlew :rum-sdk:test               # 8개 테스트
+
+# 하네스 검증 (훅, 구조, 시크릿 패턴)
+bash tests/run-all.sh                                          # 79개 테스트
 
 # E2E 통합 테스트
 ./scripts/test-ingestion.sh <api-endpoint> <api-key>

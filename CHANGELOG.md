@@ -12,6 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- OpenReplay self-hosted session replay module: CloudFront + ALB + EC2 + RDS (PostgreSQL) + ElastiCache (Redis) + S3
+- CDK `OpenReplay` Construct with 1:1 mapping to Terraform openreplay module
+- TAP-style harness validation test suite (`tests/run-all.sh`) with 108 tests covering hooks, structure, secret patterns, and content quality
+- ADR-007: OpenReplay session replay architecture decision
+- Runbook 14: OpenReplay management and operations
+- Agent YAML system prompts with structured output formats (code-reviewer, security-auditor)
+- Error recovery sections for all 3 commands and 4 skills
+- Claude Code harness section in onboarding documentation (KR/EN)
+- SSE heartbeat (15s interval) in Agent UI chat route for long-running AI analysis
+
+### Fixed
+
+- Claude Code settings: replaced invalid `PreCommit` hook key with `PreToolUse` matcher for Bash `git commit` commands
+- OpenReplay EC2 switched to x86_64 — Docker images are amd64 only
+- OpenReplay JWT secret added to Terraform, simplified user_data SSM reads
+- Agent UI SSE timeout: ALB idle_timeout 180s + CloudFront origin_keepalive_timeout 60s
+- Agent UI 401 Unauthorized: fallback to anonymous when Lambda@Edge (SSO) is not attached
+- Agent UI SSE client parsing: buffer-based event parsing to handle CloudFront response buffering
+
+### Security
+
+- Secret scanner upgraded from advisory (exit 0) to blocking gate (exit 1 on detection)
+- Secret patterns expanded from 6 to 10 (added AWS secret key, private key, JWT, Slack webhook/token)
+- Write/Edit PreToolUse hook added for secret scanning on file creation/modification
+- Deny list expanded from 8 to 18 rules (added git clean, git checkout/restore, eval, chmod 777, terraform apply -auto-approve)
+- Grafana API key scrubbed from settings.local.json allow rules
+
 ## [0.5.0] - 2026-04-04
 
 ### Added
@@ -141,6 +170,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 따릅니다.
 
 ## [Unreleased]
+
+### Added
+
+- OpenReplay 셀프호스팅 세션 리플레이 모듈: CloudFront + ALB + EC2 + RDS (PostgreSQL) + ElastiCache (Redis) + S3
+- Terraform openreplay 모듈과 1:1 대응하는 CDK `OpenReplay` Construct
+- TAP 스타일 하네스 검증 테스트 스위트 (`tests/run-all.sh`) — 훅, 구조, 시크릿 패턴, 콘텐츠 품질 108개 테스트
+- ADR-007: OpenReplay 세션 리플레이 아키텍처 결정
+- 런북 14: OpenReplay 관리 및 운영
+- 에이전트 YAML 시스템 프롬프트 + 구조화된 출력 형식 (code-reviewer, security-auditor)
+- 3개 명령 + 4개 스킬에 에러 복구 섹션 추가
+- 온보딩 문서에 Claude Code 하네스 섹션 추가 (KR/EN)
+- Agent UI 채팅 라우트에 SSE heartbeat (15초 간격) 추가
+
+### Fixed
+
+- Claude Code 설정: 잘못된 `PreCommit` 훅 키를 Bash `git commit` 매칭 `PreToolUse`로 교체
+- OpenReplay EC2를 x86_64로 전환 — Docker 이미지가 amd64 전용
+- OpenReplay Terraform에 JWT 시크릿 추가, user_data SSM 읽기 간소화
+- Agent UI SSE 타임아웃: ALB idle_timeout 180초 + CloudFront origin_keepalive_timeout 60초
+- Agent UI 401 Unauthorized: Lambda@Edge (SSO) 미연결 시 anonymous fallback
+- Agent UI SSE 클라이언트 파싱: CloudFront 응답 버퍼링 대응 버퍼 기반 이벤트 파싱
+
+### Security
+
+- 시크릿 스캐너를 권고(exit 0)에서 차단 게이트(exit 1)로 업그레이드
+- 시크릿 패턴 6개 → 10개 확장 (AWS 시크릿 키, 개인키, JWT, Slack 웹훅/토큰 추가)
+- Write/Edit PreToolUse 훅 추가 — 파일 생성/수정 시 시크릿 스캔
+- deny 리스트 8개 → 18개 확장 (git clean, git checkout/restore, eval, chmod 777, terraform apply -auto-approve)
+- settings.local.json에서 Grafana API 키 평문 제거
 
 ## [0.5.0] - 2026-04-04
 

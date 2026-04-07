@@ -120,6 +120,8 @@ systemctl daemon-reload
       internetFacing: true,
       securityGroup: albSg,
       vpcSubnets: { subnets },
+      // SSE 스트리밍: Bedrock+Athena 멀티라운드 분석 시 최대 3분 소요
+      idleTimeout: cdk.Duration.seconds(180),
     });
 
     const targetGroup = new elbv2.ApplicationTargetGroup(this, 'TargetGroup', {
@@ -154,6 +156,8 @@ systemctl daemon-reload
       defaultBehavior: {
         origin: new origins.HttpOrigin(alb.loadBalancerDnsName, {
           protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+          readTimeout: cdk.Duration.seconds(60),
+          keepaliveTimeout: cdk.Duration.seconds(60),
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
