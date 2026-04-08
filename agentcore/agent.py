@@ -13,7 +13,11 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from bedrock_agentcore.memory import MemoryClient
 from botocore.session import Session as BotocoreSession
 from strands import Agent, tool
-from strands.hooks import AgentInitializedEvent, HookProvider, MessageAddedEvent
+import queue
+from strands.hooks import (
+    AgentInitializedEvent, BeforeToolCallEvent, AfterToolCallEvent,
+    HookProvider, MessageAddedEvent,
+)
 from strands.tools.mcp import MCPClient
 
 from streamable_http_sigv4 import streamablehttp_client_with_sigv4
@@ -158,6 +162,41 @@ class MemoryHook(HookProvider):
     def register_hooks(self, registry):
         registry.add_callback(AgentInitializedEvent, self.on_agent_initialized)
         registry.add_callback(MessageAddedEvent, self.on_message_added)
+
+
+
+# ─── Streaming Hook ──────────────────────────────────────────────────────────
+class StreamingHook(HookProvider):
+    """도구 실행 상태를 queue에 전달하여 SSE 스트리밍에 사용."""
+
+    TOOL_LABELS = {
+        "query_athena": "Athena", "search_logs": "CW Logs",
+        "get_metrics": "Metrics", "describe_alarms": "Alarms",
+        "select_s3_object": "S3 Select", "get_table_schema": "Glue",
+        "create_grafana_annotation": "Grafana", "publish_sns": "SNS",
+    }
+
+    def __init__(self):
+        self.events: queue.Queue = queue.Queue()
+
+    def _label(self, event) -> str:
+        name = event.tool_use.get("name", "") if hasattr(event, "tool_use") else ""
+        return self.TOOL_LABELS.get(name, name)
+
+    def _on_before_tool(self, event: BeforeToolCallEvent) -> None:
+        label = self._label(event)
+        if label:
+            self.events.put({"type": "status", "content": f"{label} 분석 중..."})
+
+    def _on_after_tool(self, event: AfterToolCallEvent) -> None:
+        label = self._label(event)
+        if label:
+            prefix = "\u26a0\ufe0f" if getattr(event, "exception", None) else "\u2705"
+            self.events.put({"type": "status", "content": f"{prefix} {label} 완료"})
+
+    def register_hooks(self, registry):
+        registry.add_callback(BeforeToolCallEvent, self._on_before_tool)
+        registry.add_callback(AfterToolCallEvent, self._on_after_tool)
 
 
 # ─── Gateway Transport (SigV4) ───────────────────────────────────────────────
