@@ -14,6 +14,9 @@ from bedrock_agentcore.memory import MemoryClient
 from botocore.session import Session as BotocoreSession
 from strands import Agent, tool
 import queue
+import asyncio
+import concurrent.futures
+import time
 from strands.hooks import (
     AgentInitializedEvent, BeforeToolCallEvent, AfterToolCallEvent,
     HookProvider, MessageAddedEvent,
@@ -24,6 +27,8 @@ from streamable_http_sigv4 import streamablehttp_client_with_sigv4
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 REGION = os.getenv("AWS_REGION", "ap-northeast-2")
@@ -415,7 +420,7 @@ DIRECT_TOOLS = [search_logs, get_metrics, describe_alarms, select_s3_object,
 
 
 # ─── Agent Factory ────────────────────────────────────────────────────────────
-def create_agent(session_id: str = "default") -> Agent:
+def create_agent(session_id: str = "default", streaming_hook: StreamingHook | None = None) -> Agent:
     """Create Strands agent with MCP Gateway tools + direct tools."""
     tools = list(DIRECT_TOOLS)  # 항상 직접 도구 포함
     model_id = "global.anthropic.claude-sonnet-4-6"
@@ -443,32 +448,78 @@ def create_agent(session_id: str = "default") -> Agent:
 
         tools.append(query_athena)
 
-    hooks = [MemoryHook()] if MEMORY_ID else []
+    hooks: list = [MemoryHook()] if MEMORY_ID else []
+    if streaming_hook:
+        hooks.append(streaming_hook)
 
     return Agent(
         model=model_id,
         system_prompt=SYSTEM_PROMPT,
         tools=tools,
         hooks=hooks,
+        callback_handler=None,
         state={"session_id": session_id},
     )
 
 
+def split_chunks(text: str, size: int = 30) -> list[str]:
+    """텍스트를 지정 크기로 분할."""
+    return [text[i:i + size] for i in range(0, len(text), size)]
+
+
 # ─── Entrypoint ──────────────────────────────────────────────────────────────
 @app.entrypoint
-def invoke(payload, context):
-    session_id = getattr(context, "session_id", "default")
+async def invoke(payload, context):
+    session_id = payload.get("session_id", getattr(context, "session_id", "default"))
     user_message = payload.get("prompt", "오늘 RUM 현황을 알려주세요")
 
     logger.info(f"[{session_id}] User: {user_message[:100]}")
 
-    agent = create_agent(session_id)
-    response = agent(user_message)
+    yield {"type": "start"}
+    yield {"type": "status", "content": "\U0001f50d 분석 중... 리포트를 생성중입니다."}
 
-    result_text = response.message["content"][0]["text"]
-    logger.info(f"[{session_id}] Response: {result_text[:100]}...")
+    streaming_hook = StreamingHook()
+    agent = create_agent(session_id, streaming_hook=streaming_hook)
 
-    return {"result": result_text}
+    # Strands agent는 동기 함수이므로 별도 스레드에서 실행
+    loop = asyncio.get_event_loop()
+    future = loop.run_in_executor(_executor, agent, user_message)
+
+    last_heartbeat = time.time()
+
+    while not future.done():
+        # hook queue에서 도구 상태 이벤트를 yield
+        try:
+            event = streaming_hook.events.get_nowait()
+            yield event
+        except queue.Empty:
+            pass
+
+        # 15초 간격 heartbeat
+        now = time.time()
+        if now - last_heartbeat > 15:
+            yield {"type": "heartbeat"}
+            last_heartbeat = now
+
+        await asyncio.sleep(0.3)
+
+    # queue에 남은 이벤트 flush
+    while not streaming_hook.events.empty():
+        yield streaming_hook.events.get_nowait()
+
+    # 결과 처리
+    try:
+        response = future.result()
+        result_text = response.message["content"][0]["text"]
+        logger.info(f"[{session_id}] Response: {result_text[:100]}...")
+
+        for chunk in split_chunks(result_text, 30):
+            yield {"type": "chunk", "content": chunk}
+    except Exception as e:
+        logger.error(f"[{session_id}] Error: {e}")
+        yield {"type": "error", "content": str(e)}
+
+    yield {"type": "done"}
 
 
 if __name__ == "__main__":
