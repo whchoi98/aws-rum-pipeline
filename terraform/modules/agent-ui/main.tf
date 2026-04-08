@@ -90,9 +90,9 @@ resource "aws_iam_role_policy" "ec2_agentcore" {
         Resource = "*"
       },
       {
-        Sid    = "LambdaInvoke"
-        Effect = "Allow"
-        Action = ["lambda:InvokeFunction"]
+        Sid      = "LambdaInvoke"
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
         Resource = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-*"
       },
       {
@@ -172,6 +172,14 @@ resource "aws_instance" "agent_ui" {
     AWS_REGION=ap-northeast-2
     AGENTCORE_ENDPOINT_ARN=${var.agentcore_endpoint_arn}
     ENV
+
+
+    # agent.py 사이드카 서비스 설정
+    pip3 install -r /opt/rum-agent-ui/agentcore/requirements.txt
+
+    cp /opt/rum-agent-ui/agentcore/rum-agent.service /etc/systemd/system/
+    systemctl daemon-reload
+    systemctl enable --now rum-agent
 
     echo "EC2 초기화 완료. Next.js 앱을 배포해 주세요."
   USERDATA
