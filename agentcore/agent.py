@@ -419,21 +419,38 @@ DIRECT_TOOLS = [search_logs, get_metrics, describe_alarms, select_s3_object,
                 get_table_schema, create_grafana_annotation, publish_sns]
 
 
-# ─── Agent Factory ────────────────────────────────────────────────────────────
-def create_agent(session_id: str = "default", streaming_hook: StreamingHook | None = None) -> Agent:
-    """Create Strands agent with MCP Gateway tools + direct tools."""
-    tools = list(DIRECT_TOOLS)  # 항상 직접 도구 포함
+# ─── Agent Runner ─────────────────────────────────────────────────────────────
+def run_agent(session_id: str, user_message: str, streaming_hook: StreamingHook | None = None):
+    """MCP 컨텍스트 내에서 에이전트를 생성하고 실행. 스레드에서 호출."""
+    tools = list(DIRECT_TOOLS)
     model_id = "global.anthropic.claude-sonnet-4-6"
+
+    hooks: list = [MemoryHook()] if MEMORY_ID else []
+    if streaming_hook:
+        hooks.append(streaming_hook)
+
+    def _make_and_run(extra_tools=None):
+        if extra_tools:
+            tools.extend(extra_tools)
+        agent = Agent(
+            model=model_id,
+            system_prompt=SYSTEM_PROMPT,
+            tools=tools,
+            hooks=hooks,
+            callback_handler=None,
+            state={"session_id": session_id},
+        )
+        return agent(user_message)
 
     if GATEWAY_URL:
         logger.info(f"Connecting to Gateway: {GATEWAY_URL}")
         mcp_client = MCPClient(lambda: create_gateway_transport(GATEWAY_URL))
-        gateway_tools = mcp_client.list_tools_sync()
-        tools.extend(gateway_tools)
-        logger.info(f"Discovered {len(gateway_tools)} Gateway tools + {len(DIRECT_TOOLS)} direct tools")
+        with mcp_client:
+            gateway_tools = mcp_client.list_tools_sync()
+            logger.info(f"Discovered {len(gateway_tools)} Gateway tools + {len(DIRECT_TOOLS)} direct tools")
+            return _make_and_run(gateway_tools)
     else:
         logger.info("No GATEWAY_URL set — using direct Lambda + boto3 tools")
-        # Athena는 Lambda 호출로 (Gateway 없을 때)
         lambda_client = boto3.client("lambda", region_name=REGION)
         athena_lambda = os.getenv("ATHENA_LAMBDA", "rum-pipeline-athena-query")
 
@@ -446,20 +463,7 @@ def create_agent(session_id: str = "default", streaming_hook: StreamingHook | No
             )
             return resp["Payload"].read().decode()
 
-        tools.append(query_athena)
-
-    hooks: list = [MemoryHook()] if MEMORY_ID else []
-    if streaming_hook:
-        hooks.append(streaming_hook)
-
-    return Agent(
-        model=model_id,
-        system_prompt=SYSTEM_PROMPT,
-        tools=tools,
-        hooks=hooks,
-        callback_handler=None,
-        state={"session_id": session_id},
-    )
+        return _make_and_run([query_athena])
 
 
 def split_chunks(text: str, size: int = 30) -> list[str]:
@@ -479,11 +483,12 @@ async def invoke(payload, context):
     yield {"type": "status", "content": "\U0001f50d 분석 중... 리포트를 생성중입니다."}
 
     streaming_hook = StreamingHook()
-    agent = create_agent(session_id, streaming_hook=streaming_hook)
 
-    # Strands agent는 동기 함수이므로 별도 스레드에서 실행
+    # MCP 컨텍스트 포함 에이전트 생성+실행을 별도 스레드에서 수행
     loop = asyncio.get_event_loop()
-    future = loop.run_in_executor(_executor, agent, user_message)
+    future = loop.run_in_executor(
+        _executor, run_agent, session_id, user_message, streaming_hook
+    )
 
     last_heartbeat = time.time()
 

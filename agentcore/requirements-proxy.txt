@@ -1,0 +1,5 @@
+bedrock-agentcore
+websockets
+starlette
+uvicorn
+boto3
