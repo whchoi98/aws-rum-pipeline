@@ -22,16 +22,16 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 - **sdk/** — TypeScript RUM SDK. 브라우저에서 페이지뷰, 에러, 사용자 액션 이벤트 수집. esbuild 번들.
 - **mobile-sdk-ios/** — iOS RUM SDK (Swift 5.9+, SPM). iOS 15+ 지원. 브라우저 SDK와 동일한 이벤트 스키마.
 - **mobile-sdk-android/** — Android RUM SDK (Kotlin 1.9+, Gradle). minSdk 26 지원. 브라우저 SDK와 동일한 이벤트 스키마.
-- **terraform/modules/api-gateway/** — HTTP API Gateway. `/ingest` 엔드포인트 노출. Lambda Authorizer 연결.
+- **terraform/modules/api-gateway/** — HTTP API Gateway. `POST /v1/events`, `POST /v1/events/beacon` 엔드포인트. Lambda Authorizer 연결.
 - **lambda/authorizer/** — JWT/API Key 검증 Lambda Authorizer. 인증 실패 시 403.
 - **lambda/ingest/** — HTTP 요청을 Kinesis Firehose로 포워딩하는 브리지 Lambda.
 
 ### Storage Layer
-- **terraform/modules/firehose/** — Kinesis Data Firehose. S3로 버퍼링 전달. 파티셔닝 설정 포함.
-- **terraform/modules/s3-data-lake/** — S3 버킷 3개: raw 이벤트, processed 데이터, Athena 쿼리 결과.
+- **terraform/modules/firehose/** — Kinesis Data Firehose. 동적 파티셔닝(platform/year/month/day/hour) + JSON→Parquet 변환. Transform Lambda 연결.
+- **terraform/modules/s3-data-lake/** — 단일 S3 데이터 레이크 버킷. `raw/`, `aggregated/`, `athena-results/`, `errors/` 프리픽스. KMS 암호화, 생명주기 관리.
 
 ### Processing Layer
-- **lambda/transform/** — Firehose 이벤트 변환. JSON 정규화, 스키마 검증.
+- **lambda/transform/** — Firehose 이벤트 변환. JSON 정규화, 스키마 검증, PII 제거, 파티션 키 생성.
 - **lambda/partition-repair/** — Glue 파티션 자동 복구 (`MSCK REPAIR TABLE`). EventBridge 스케줄 트리거.
 - **terraform/modules/partition-repair/** — partition-repair Lambda 인프라.
 
@@ -45,17 +45,18 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 - **terraform/modules/grafana/** — Amazon Managed Grafana 워크스페이스. Athena 데이터소스 연결.
 
 ### Security Layer
-- **terraform/modules/security/** — WAF WebACL, API Key 관리, IAM 역할/정책.
+- **terraform/modules/security/** — WAF WebACL (Rate Limit + Bot Control), API Key 관리, IAM 역할/정책.
 - **terraform/modules/auth/** — Cognito User Pool + SSO IdP + Lambda@Edge 인증.
   - CloudFront viewer-request에서 JWT 검증, 미인증 시 Cognito Hosted UI 리다이렉트.
   - `x-user-sub` 헤더로 사용자 식별, AgentCore Memory에서 사용자별 대화 히스토리 분리.
+- **lambda/edge-auth/** — CloudFront Lambda@Edge JWT 검증 함수 (Node.js 20). 토큰 교환, 로그아웃 처리.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore 기반 RUM 분석 에이전트.
-  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8개 도구: Athena SQL, CW Logs/Metrics/Alarms, S3 Select, Glue, Grafana API, SNS.
-  - `web/` — 간단한 HTML 프로토타입 (레거시).
-  - `web-app/` — Next.js 14 Web UI (메인 채팅 인터페이스).
-- **terraform/modules/agent-ui/** — AgentCore UI 호스팅 인프라.
+  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8개 도구. SSE 스트리밍 사이드카 (port 8080).
+  - Athena/Trino 금지 함수 규칙. 라운드당 최대 2개 도구 호출 제한. StreamingHook으로 도구 실행 상태 전달.
+  - `web-app/` — Next.js 14 Web UI. route.ts는 agent.py의 SSE 프록시 역할 (~50줄).
+- **terraform/modules/agent-ui/** — AgentCore UI 호스팅 인프라 + agent.py systemd 서비스.
 
 ### Session Replay
 - **terraform/modules/openreplay/** — OpenReplay 셀프호스팅 인프라. CF → ALB → EC2 (Docker Compose).
@@ -152,7 +153,7 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 │  │ HTTPS     │   │             │   │         │   │ Next.js 14 Chat UI       │  │
 │  │           │   │ JWT 검증    │   │ SG:     │   │ ├─ /api/chat (SSE)       │  │
 │  │           │   │ ┌─────────┐ │   │ CF only │   │ │  └─ Bedrock Claude     │  │
-│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4            │  │
+│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4.6          │  │
 │  │           │   │ │ User    │ │   └─────────┘   │ │  └─ Athena Query Lambda│  │
 │  │           │   │ │ Pool    │ │                  │ │     (SQL 자동 생성/실행) │  │
 │  │           │   │ │ + SSO   │ │                  │ │                         │  │
@@ -225,10 +226,10 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 ### Terraform Modules (terraform/modules/)
 | 모듈 | 리소스 | 설명 |
 |------|--------|------|
-| s3-data-lake | S3 Buckets | raw, processed, athena-results |
-| glue-catalog | Glue DB + Table | rum_events 스키마 |
-| firehose | Kinesis Firehose | S3 delivery, transform Lambda 연결 |
-| api-gateway | HTTP API, Lambda Integration | /ingest POST |
+| s3-data-lake | S3 Bucket | 단일 버킷 (raw/, aggregated/, athena-results/, errors/ 프리픽스) |
+| glue-catalog | Glue DB + 3 Tables | rum_events, rum_hourly_metrics, rum_daily_summary |
+| firehose | Kinesis Firehose | 동적 파티셔닝 + Parquet 변환, Transform Lambda |
+| api-gateway | HTTP API, Lambda Integration | POST /v1/events, /v1/events/beacon |
 | security | WAF, API Key, IAM | 인증/인가 인프라 |
 | monitoring | CloudWatch | 대시보드, 알람 |
 | grafana | AMG Workspace | Athena 데이터소스 |
@@ -275,6 +276,10 @@ CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 - Terraform + CDK 듀얼 IaC로 팀별 선호 도구 선택 가능 (Lambda 소스 공유)
 - OpenReplay 셀프호스팅으로 세션 리플레이 데이터 주권 확보 (SaaS 대비 비용 절감, RDS+Redis+S3 외부 관리형)
 - Agent UI ALB idle_timeout 180초 + SSE heartbeat(15초 간격)로 멀티라운드 AI 분석 타임아웃 방지
+- Athena/Trino 금지 함수 목록 (COUNTIF, SAFE_DIVIDE, IFNULL, IF, GROUP_CONCAT)으로 SQL 호환성 보장
+- 에이전트 도구 호출 제한 (라운드당 최대 2개)으로 불필요한 API 호출 방지 및 비용 최적화
+- Agent UI PDF/Word 리포트 다운로드는 DOM clone 방식으로 서버 사이드 렌더링 없이 구현
+- agent.py를 SSE 스트리밍 사이드카로 실행, route.ts는 프록시로 역할 분리 (코드 중복 제거, 단일 프롬프트/도구 관리)
 
 <p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
 
@@ -295,16 +300,16 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 - **sdk/** — TypeScript RUM SDK. Collects page views, errors, and user action events from the browser. Bundled with esbuild.
 - **mobile-sdk-ios/** — iOS RUM SDK (Swift 5.9+, SPM). Supports iOS 15+. Same event schema as the browser SDK.
 - **mobile-sdk-android/** — Android RUM SDK (Kotlin 1.9+, Gradle). Supports minSdk 26. Same event schema as the browser SDK.
-- **terraform/modules/api-gateway/** — HTTP API Gateway. Exposes the `/ingest` endpoint. Connected to Lambda Authorizer.
+- **terraform/modules/api-gateway/** — HTTP API Gateway. `POST /v1/events`, `POST /v1/events/beacon` endpoints. Connected to Lambda Authorizer.
 - **lambda/authorizer/** — JWT/API Key validation Lambda Authorizer. Returns 403 on authentication failure.
 - **lambda/ingest/** — Bridge Lambda that forwards HTTP requests to Kinesis Firehose.
 
 ### Storage Layer
-- **terraform/modules/firehose/** — Kinesis Data Firehose. Buffered delivery to S3. Includes partitioning configuration.
-- **terraform/modules/s3-data-lake/** — 3 S3 buckets: raw events, processed data, Athena query results.
+- **terraform/modules/firehose/** — Kinesis Data Firehose. Dynamic partitioning (platform/year/month/day/hour) + JSON→Parquet conversion. Transform Lambda integration.
+- **terraform/modules/s3-data-lake/** — Single S3 data lake bucket. `raw/`, `aggregated/`, `athena-results/`, `errors/` prefixes. KMS encryption, lifecycle management.
 
 ### Processing Layer
-- **lambda/transform/** — Firehose event transformation. JSON normalization, schema validation.
+- **lambda/transform/** — Firehose event transformation. JSON normalization, schema validation, PII removal, partition key generation.
 - **lambda/partition-repair/** — Automatic Glue partition repair (`MSCK REPAIR TABLE`). Triggered by EventBridge schedule.
 - **terraform/modules/partition-repair/** — partition-repair Lambda infrastructure.
 
@@ -318,17 +323,18 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 - **terraform/modules/grafana/** — Amazon Managed Grafana workspace. Connected to Athena data source.
 
 ### Security Layer
-- **terraform/modules/security/** — WAF WebACL, API Key management, IAM roles/policies.
+- **terraform/modules/security/** — WAF WebACL (Rate Limit + Bot Control), API Key management, IAM roles/policies.
 - **terraform/modules/auth/** — Cognito User Pool + SSO IdP + Lambda@Edge authentication.
   - JWT validation at CloudFront viewer-request; redirects to Cognito Hosted UI when unauthenticated.
   - User identification via `x-user-sub` header; per-user conversation history isolation in AgentCore Memory.
+- **lambda/edge-auth/** — CloudFront Lambda@Edge JWT verification function (Node.js 20). Token exchange, logout handling.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore-based RUM analysis agent.
-  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8 tools: Athena SQL, CW Logs/Metrics/Alarms, S3 Select, Glue, Grafana API, SNS.
-  - `web/` — Simple HTML prototype (legacy).
-  - `web-app/` — Next.js 14 Web UI (main chat interface).
-- **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure.
+  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8 tools. SSE streaming sidecar (port 8080).
+  - Athena/Trino forbidden function rules. Max 2 tool calls per round. StreamingHook for tool execution status.
+  - `web-app/` — Next.js 14 Web UI. route.ts acts as SSE proxy to agent.py (~50 lines).
+- **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure + agent.py systemd service.
 
 ### Session Replay
 - **terraform/modules/openreplay/** — Self-hosted OpenReplay infrastructure. CF → ALB → EC2 (Docker Compose).
@@ -426,7 +432,7 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 │  │ HTTPS     │   │             │   │         │   │ Next.js 14 Chat UI       │  │
 │  │           │   │ JWT Verify  │   │ SG:     │   │ ├─ /api/chat (SSE)       │  │
 │  │           │   │ ┌─────────┐ │   │ CF only │   │ │  └─ Bedrock Claude     │  │
-│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4            │  │
+│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4.6          │  │
 │  │           │   │ │ User    │ │   └─────────┘   │ │  └─ Athena Query Lambda│  │
 │  │           │   │ │ Pool    │ │                  │ │     (Auto SQL Gen/Exec)│  │
 │  │           │   │ │ + SSO   │ │                  │ │                         │  │
@@ -499,10 +505,10 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
 ### Terraform Modules (terraform/modules/)
 | Module | Resources | Description |
 |--------|-----------|-------------|
-| s3-data-lake | S3 Buckets | raw, processed, athena-results |
-| glue-catalog | Glue DB + Table | rum_events schema |
-| firehose | Kinesis Firehose | S3 delivery, transform Lambda integration |
-| api-gateway | HTTP API, Lambda Integration | /ingest POST |
+| s3-data-lake | S3 Bucket | Single bucket (raw/, aggregated/, athena-results/, errors/ prefixes) |
+| glue-catalog | Glue DB + 3 Tables | rum_events, rum_hourly_metrics, rum_daily_summary |
+| firehose | Kinesis Firehose | Dynamic partitioning + Parquet conversion, Transform Lambda |
+| api-gateway | HTTP API, Lambda Integration | POST /v1/events, /v1/events/beacon |
 | security | WAF, API Key, IAM | Authentication/authorization infrastructure |
 | monitoring | CloudWatch | Dashboards, alarms |
 | grafana | AMG Workspace | Athena data source |
@@ -549,5 +555,9 @@ CDK commands: `cd cdk && npx cdk synth / deploy / diff`
 - Dual IaC with Terraform + CDK for team tool preference flexibility (shared Lambda source)
 - Self-hosted OpenReplay for session replay data sovereignty (cost savings vs SaaS, RDS+Redis+S3 as external managed services)
 - Agent UI ALB idle_timeout 180s + SSE heartbeat (15s interval) to prevent multi-round AI analysis timeouts
+- Athena/Trino forbidden function list (COUNTIF, SAFE_DIVIDE, IFNULL, IF, GROUP_CONCAT) ensures SQL compatibility
+- Agent tool call limit (max 2 per round) prevents unnecessary API calls and optimizes cost
+- Agent UI PDF/Word report download implemented via DOM cloning without server-side rendering
+- agent.py runs as SSE streaming sidecar, route.ts acts as proxy (eliminates code duplication, single prompt/tool management)
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>
