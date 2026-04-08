@@ -1,0 +1,18 @@
+[Unit]
+Description=RUM AgentCore Agent (Strands + Bedrock Sonnet 4.6)
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/rum-agent-ui/agentcore
+EnvironmentFile=/opt/rum-agent-ui/.env
+ExecStart=/usr/bin/python3 agent.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rum-agent
+
+[Install]
+WantedBy=multi-user.target
