@@ -31,6 +31,10 @@ The pipeline processes approximately 1.8M events/day for 50K DAU at an estimated
 - **SSO Authentication** — CloudFront + Lambda@Edge + Cognito SSO for Agent UI access control with per-user memory.
 - **Session Replay** — Self-hosted OpenReplay integration via CloudFront + ALB + EC2 with RDS, Redis, and S3 backend.
 
+## Architecture
+
+![Architecture](screen-shot/rum-pipeline-architecture.png)
+
 ## Screenshots
 
 ### AI Analysis Agent (Bedrock AgentCore + Claude Sonnet 4.6)
@@ -269,6 +273,10 @@ DAU 5만 기준 약 180만 이벤트/일을 처리하며, 예상 비용은 월 ~
 - **Infrastructure as Code** — Terraform(12개 모듈)과 AWS CDK(12개 Construct) 듀얼 IaC 지원
 - **SSO 인증** — CloudFront + Lambda@Edge + Cognito SSO로 Agent UI 접근 제어 및 사용자별 메모리
 - **세션 리플레이** — CloudFront + ALB + EC2 기반 셀프호스팅 OpenReplay 연동 (RDS, Redis, S3 백엔드)
+
+## 아키텍처
+
+![Architecture](screen-shot/rum-pipeline-architecture.png)
 
 ## 스크린샷
 
