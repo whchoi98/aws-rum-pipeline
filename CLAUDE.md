@@ -57,6 +57,8 @@ agentcore/          - Bedrock AgentCore RUM 분석 에이전트 + Web UI
   agent.py          - 에이전트 메인 (Strands, MCP)
   web/              - 간단한 HTML 프로토타입 (레거시)
   web-app/          - Next.js 14 Web UI (메인 채팅 인터페이스)
+  proxy.py          - EC2 HTTP 프록시 (AgentCore Runtime invoke, port 8080)
+  rum-agent.service - proxy.py systemd 서비스
 cdk/                - AWS CDK (TypeScript) — Terraform과 동일 인프라
   lib/constructs/   - 12개 Construct (Terraform 모듈과 1:1 대응, auth·openreplay 포함)
   lib/rum-pipeline-stack.ts - 메인 스택
@@ -211,6 +213,8 @@ agentcore/          - Bedrock AgentCore RUM analytics agent + Web UI
   agent.py          - Agent main entry (Strands, MCP)
   web/              - Simple HTML prototype (legacy)
   web-app/          - Next.js 14 Web UI (main chat interface)
+  proxy.py          - EC2 HTTP proxy (AgentCore Runtime invoke, port 8080)
+  rum-agent.service - proxy.py systemd service
 cdk/                - AWS CDK (TypeScript) — same infrastructure as Terraform
   lib/constructs/   - 12 Constructs (1:1 mapping with Terraform modules, incl. auth & openreplay)
   lib/rum-pipeline-stack.ts - Main stack
