@@ -53,10 +53,14 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore 기반 RUM 분석 에이전트.
-  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8개 도구. SSE 스트리밍 사이드카 (port 8080).
-  - Athena/Trino 금지 함수 규칙. 라운드당 최대 2개 도구 호출 제한. StreamingHook으로 도구 실행 상태 전달.
-  - `web-app/` — Next.js 14 Web UI. route.ts는 agent.py의 SSE 프록시 역할 (~50줄).
-- **terraform/modules/agent-ui/** — AgentCore UI 호스팅 인프라 + agent.py systemd 서비스.
+  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8개 도구. AgentCore Runtime 컨테이너에서 실행.
+  - `proxy.py` — EC2에서 실행되는 경량 HTTP 프록시. boto3 `invoke-agent-runtime`으로 AgentCore Runtime 호출, SSE 스트리밍 중계.
+  - `web-app/` — Next.js 14 Web UI. route.ts는 proxy.py의 SSE 프록시 역할 (~46줄).
+- **AgentCore 관리형 서비스:**
+  - **Runtime** — agent.py 컨테이너 호스팅 (ECR 이미지, 자동 스케일링)
+  - **Gateway** — MCP 프로토콜로 Athena Query Lambda 연결 (`rum-athena-gw`)
+  - **Memory** — 사용자별 대화 히스토리 저장 (`rum_analysis_memory`, session_id=x-user-sub)
+- **terraform/modules/agent-ui/** — Agent UI 호스팅 인프라 (CloudFront + ALB + EC2 + proxy.py systemd)
 
 ### Session Replay
 - **terraform/modules/openreplay/** — OpenReplay 셀프호스팅 인프라. CF → ALB → EC2 (Docker Compose).
@@ -145,28 +149,39 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
              │
              ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        AI 분석 에이전트 (Agent UI)                                │
+│                        AI 분석 에이전트 (Agent UI → AgentCore)                    │
 │                                                                                 │
 │  ┌───────────┐   ┌─────────────┐   ┌─────────┐   ┌──────────────────────────┐  │
 │  │ CloudFront│──▶│ Lambda@Edge │──▶│  ALB    │──▶│ EC2 (t4g.large)         │  │
-│  │           │   │ viewer-req  │   │ (HTTP)  │   │                          │  │
-│  │ HTTPS     │   │             │   │         │   │ Next.js 14 Chat UI       │  │
-│  │           │   │ JWT 검증    │   │ SG:     │   │ ├─ /api/chat (SSE)       │  │
-│  │           │   │ ┌─────────┐ │   │ CF only │   │ │  └─ Bedrock Claude     │  │
-│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4.6          │  │
-│  │           │   │ │ User    │ │   └─────────┘   │ │  └─ Athena Query Lambda│  │
-│  │           │   │ │ Pool    │ │                  │ │     (SQL 자동 생성/실행) │  │
-│  │           │   │ │ + SSO   │ │                  │ │                         │  │
-│  │           │   │ │ IdP     │ │                  │ └─ x-user-sub 헤더       │  │
-│  │           │   │ └─────────┘ │                  │    └─ 사용자별 Memory     │  │
-│  └───────────┘   │             │                  │                          │  │
-│                  │ x-user-sub  │                  │ ┌──────────────────────┐  │  │
-│                  │ 헤더 주입    │                  │ │ Bedrock AgentCore    │  │  │
-│                  └─────────────┘                  │ │ - Runtime            │  │  │
-│                                                   │ │ - Gateway (Athena)   │  │  │
-│                                                   │ │ - Memory (per-user)  │  │  │
-│                                                   │ └──────────────────────┘  │  │
-│                                                   └──────────────────────────┘  │
+│  │ (HTTPS)   │   │ (JWT 검증)  │   │ (180s)  │   │                          │  │
+│  └───────────┘   │ ┌─────────┐ │   │ SG:     │   │ Next.js :3000            │  │
+│                  │ │ Cognito │ │   │ CF only │   │  └─ route.ts (SSE 프록시) │  │
+│                  │ │ SSO IdP │ │   └─────────┘   │       │                   │  │
+│                  │ └─────────┘ │                  │       ▼                   │  │
+│                  │ x-user-sub  │                  │ proxy.py :8080            │  │
+│                  │ 헤더 주입    │                  │  └─ boto3 invoke          │  │
+│                  └─────────────┘                  │     -agent-runtime        │  │
+│                                                   └──────────┬───────────────┘  │
+│                                                              │ SigV4            │
+│  ┌───────────────────────────────────────────────────────────▼───────────────┐  │
+│  │                    Bedrock AgentCore (관리형 서비스)                        │  │
+│  │                                                                           │  │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ Runtime (rumAnalysisAgent)                                          │  │  │
+│  │  │  agent.py — Strands Agent (Claude Sonnet 4.6)                      │  │  │
+│  │  │  ├─ StreamingHook → SSE 이벤트 (status, chunk, done)               │  │  │
+│  │  │  ├─ MemoryHook → 대화 히스토리 자동 저장/로드                        │  │  │
+│  │  │  └─ 8개 도구 (MCP Gateway 1개 + boto3 직접 7개)                     │  │  │
+│  │  └─────────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                           │  │
+│  │  ┌──────────────────────┐  ┌───────────────────────────────────────────┐  │  │
+│  │  │ Memory               │  │ Gateway (rum-athena-gw)                   │  │  │
+│  │  │ rum_analysis_memory  │  │  └─ Target: athena-query                  │  │  │
+│  │  │ session_id =         │  │     └─ Lambda: rum-pipeline-athena-query  │  │  │
+│  │  │   x-user-sub         │  │        MCP Tool: query_athena(sql)        │  │  │
+│  │  │ (사용자별 격리)       │  │        → Athena SQL 실행 + 결과 반환       │  │  │
+│  │  └──────────────────────┘  └───────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -212,10 +227,80 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
                               ▼               ▼               ▼
                           Grafana      CloudWatch       Agent UI
                          (시각화)      (운영 모니터링)   (AI 분석)
-                                                              │
-                                                    Bedrock Claude Sonnet
-                                                    + Athena SQL 자동 생성
-                                                    + Per-User Memory
+```
+
+## AI 분석 요청 흐름 (사용자 → AgentCore)
+
+```
+사용자 (브라우저)
+  │ POST /api/chat { prompt: "오늘 RUM 현황을 알려줘" }
+  ▼
+CloudFront (HTTPS) → Lambda@Edge (JWT 검증, x-user-sub 헤더 주입) → ALB (idle 180초)
+  │
+  ▼
+EC2 Next.js route.ts :3000 (SSE 프록시, ~46줄)
+  │ fetch("http://localhost:8080/invocations", { prompt, session_id: x-user-sub })
+  ▼
+EC2 proxy.py :8080 (systemd: rum-agent.service)
+  │ boto3.client("bedrock-agentcore").invoke_agent_runtime(
+  │     agentRuntimeArn=".../rumAnalysisAgent-...",
+  │     qualifier="rumAgentEndpoint",
+  │     payload=b'{"prompt":"...","session_id":"..."}'
+  │ )
+  │ → resp["response"].iter_chunks() → SSE 중계
+  ▼
+AgentCore Runtime (관리형, 컨테이너: rum-agent:latest)
+  │ @app.entrypoint async def invoke()
+  │   ① MemoryHook: AgentCore Memory에서 최근 5턴 대화 로드 (session_id=x-user-sub)
+  │   ② StreamingHook: 도구 실행 상태를 SSE 이벤트로 push
+  │   ③ MCP Gateway 연결 (SigV4, Athena Query Lambda 도구 발견)
+  ▼
+Strands Agent (Claude Sonnet 4.6, Bedrock Converse API, native tool_use)
+  │
+  ├── [MCP Gateway 경유] query_athena(sql)
+  │     → rum-athena-gw → Lambda:rum-pipeline-athena-query → Athena
+  │     → SQL: SELECT ... FROM rum_pipeline_db.rum_events WHERE year/month/day
+  │
+  ├── [boto3 직접 호출] search_logs(log_group, pattern)    → CloudWatch Logs
+  ├── [boto3 직접 호출] get_metrics(namespace, metric)     → CloudWatch Metrics
+  ├── [boto3 직접 호출] describe_alarms(state)             → CloudWatch Alarms
+  ├── [boto3 직접 호출] select_s3_object(key, expression)  → S3 Select
+  ├── [boto3 직접 호출] get_table_schema(table)            → Glue Catalog
+  ├── [boto3 직접 호출] create_grafana_annotation(text)    → Grafana API
+  └── [boto3 직접 호출] publish_sns(message)               → SNS Publish
+  │
+  ▼
+SSE 응답 스트림 (역방향)
+  agent.py yield → AgentCore Runtime → proxy.py iter_chunks → route.ts passthrough → 브라우저
+    {"type": "start"}
+    {"type": "status", "content": "Athena 분석 중..."}
+    {"type": "status", "content": "✅ Athena 완료"}
+    {"type": "heartbeat"}                                   ← 15초 간격
+    {"type": "chunk", "content": "## 오늘 RUM 현황..."}     ← 마크다운 분석 리포트
+    {"type": "done"}
+```
+
+### AgentCore Gateway 구성
+
+```
+rum-athena-gw (MCP 프로토콜, IAM 인증)
+  └── Target: athena-query (READY)
+        ├── Lambda: rum-pipeline-athena-query
+        │   (비동기 Athena 쿼리: 실행 → 폴링 → 결과 반환)
+        └── MCP Tool: query_athena
+              ├── 입력: { "sql": "SELECT ... FROM rum_pipeline_db.rum_events WHERE ..." }
+              ├── 제약: SELECT만 허용, year/month/day 파티션 필터 필수
+              └── 금지 함수: COUNTIF→COUNT_IF, SAFE_DIVIDE→TRY, IFNULL→COALESCE
+```
+
+### 사용자별 격리
+
+```
+사용자 A (Cognito sub: "aaa") → Lambda@Edge x-user-sub: "aaa"
+  → proxy.py session_id: "aaa" → AgentCore Memory: 사용자 A 대화만 로드/저장
+
+사용자 B (Cognito sub: "bbb") → Lambda@Edge x-user-sub: "bbb"
+  → proxy.py session_id: "bbb" → AgentCore Memory: 사용자 B 대화만 로드/저장
 ```
 
 ## Infrastructure
@@ -279,7 +364,9 @@ CDK 명령: `cd cdk && npx cdk synth / deploy / diff`
 - Athena/Trino 금지 함수 목록 (COUNTIF, SAFE_DIVIDE, IFNULL, IF, GROUP_CONCAT)으로 SQL 호환성 보장
 - 에이전트 도구 호출 제한 (라운드당 최대 2개)으로 불필요한 API 호출 방지 및 비용 최적화
 - Agent UI PDF/Word 리포트 다운로드는 DOM clone 방식으로 서버 사이드 렌더링 없이 구현
-- agent.py를 SSE 스트리밍 사이드카로 실행, route.ts는 프록시로 역할 분리 (코드 중복 제거, 단일 프롬프트/도구 관리)
+- EC2 proxy.py → AgentCore Runtime invoke API로 에이전트 호출 (route.ts는 SSE 프록시만, 코드 중복 제거)
+- MCP Gateway로 Athena만 연결, 나머지 7개 도구는 agent.py에서 boto3 직접 호출 (비동기 쿼리만 Lambda 캡슐화)
+- AgentCore Runtime 컨테이너로 agent.py 배포, ECR 이미지 버전 관리로 무중단 업데이트
 
 <p align="right"><a href="#-english">🇺🇸 English ↓</a></p>
 
@@ -331,10 +418,14 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 
 ### Analysis Agent
 - **agentcore/** — Bedrock AgentCore-based RUM analysis agent.
-  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8 tools. SSE streaming sidecar (port 8080).
-  - Athena/Trino forbidden function rules. Max 2 tool calls per round. StreamingHook for tool execution status.
-  - `web-app/` — Next.js 14 Web UI. route.ts acts as SSE proxy to agent.py (~50 lines).
-- **terraform/modules/agent-ui/** — AgentCore UI hosting infrastructure + agent.py systemd service.
+  - `agent.py` — Strands Agent (Claude Sonnet 4.6) + 8 tools. Runs inside AgentCore Runtime container.
+  - `proxy.py` — Lightweight HTTP proxy on EC2. Calls AgentCore Runtime via boto3 `invoke-agent-runtime`, relays SSE stream.
+  - `web-app/` — Next.js 14 Web UI. route.ts acts as SSE proxy to proxy.py (~46 lines).
+- **AgentCore Managed Services:**
+  - **Runtime** — Hosts agent.py container (ECR image, auto-scaling)
+  - **Gateway** — Connects Athena Query Lambda via MCP protocol (`rum-athena-gw`)
+  - **Memory** — Per-user conversation history (`rum_analysis_memory`, session_id=x-user-sub)
+- **terraform/modules/agent-ui/** — Agent UI hosting infra (CloudFront + ALB + EC2 + proxy.py systemd)
 
 ### Session Replay
 - **terraform/modules/openreplay/** — Self-hosted OpenReplay infrastructure. CF → ALB → EC2 (Docker Compose).
@@ -424,28 +515,39 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
              │
              ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        AI Analysis Agent (Agent UI)                              │
+│                     AI Analysis Agent (Agent UI → AgentCore)                     │
 │                                                                                 │
 │  ┌───────────┐   ┌─────────────┐   ┌─────────┐   ┌──────────────────────────┐  │
 │  │ CloudFront│──▶│ Lambda@Edge │──▶│  ALB    │──▶│ EC2 (t4g.large)         │  │
-│  │           │   │ viewer-req  │   │ (HTTP)  │   │                          │  │
-│  │ HTTPS     │   │             │   │         │   │ Next.js 14 Chat UI       │  │
-│  │           │   │ JWT Verify  │   │ SG:     │   │ ├─ /api/chat (SSE)       │  │
-│  │           │   │ ┌─────────┐ │   │ CF only │   │ │  └─ Bedrock Claude     │  │
-│  │           │   │ │ Cognito │ │   │         │   │ │     Sonnet 4.6          │  │
-│  │           │   │ │ User    │ │   └─────────┘   │ │  └─ Athena Query Lambda│  │
-│  │           │   │ │ Pool    │ │                  │ │     (Auto SQL Gen/Exec)│  │
-│  │           │   │ │ + SSO   │ │                  │ │                         │  │
-│  │           │   │ │ IdP     │ │                  │ └─ x-user-sub Header     │  │
-│  │           │   │ └─────────┘ │                  │    └─ Per-User Memory    │  │
-│  └───────────┘   │             │                  │                          │  │
-│                  │ x-user-sub  │                  │ ┌──────────────────────┐  │  │
-│                  │ Header      │                  │ │ Bedrock AgentCore    │  │  │
-│                  │ Injection   │                  │ │ - Runtime            │  │  │
-│                  └─────────────┘                  │ │ - Gateway (Athena)   │  │  │
-│                                                   │ │ - Memory (per-user)  │  │  │
-│                                                   │ └──────────────────────┘  │  │
-│                                                   └──────────────────────────┘  │
+│  │ (HTTPS)   │   │ (JWT Verify)│   │ (180s)  │   │                          │  │
+│  └───────────┘   │ ┌─────────┐ │   │ SG:     │   │ Next.js :3000            │  │
+│                  │ │ Cognito │ │   │ CF only │   │  └─ route.ts (SSE proxy) │  │
+│                  │ │ SSO IdP │ │   └─────────┘   │       │                   │  │
+│                  │ └─────────┘ │                  │       ▼                   │  │
+│                  │ x-user-sub  │                  │ proxy.py :8080            │  │
+│                  │ Header      │                  │  └─ boto3 invoke          │  │
+│                  │ Injection   │                  │     -agent-runtime        │  │
+│                  └─────────────┘                  └──────────┬───────────────┘  │
+│                                                              │ SigV4            │
+│  ┌───────────────────────────────────────────────────────────▼───────────────┐  │
+│  │                    Bedrock AgentCore (Managed Services)                    │  │
+│  │                                                                           │  │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ Runtime (rumAnalysisAgent)                                          │  │  │
+│  │  │  agent.py — Strands Agent (Claude Sonnet 4.6)                      │  │  │
+│  │  │  ├─ StreamingHook → SSE events (status, chunk, done)               │  │  │
+│  │  │  ├─ MemoryHook → auto save/load conversation history               │  │  │
+│  │  │  └─ 8 tools (1 MCP Gateway + 7 boto3 direct)                      │  │  │
+│  │  └─────────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                           │  │
+│  │  ┌──────────────────────┐  ┌───────────────────────────────────────────┐  │  │
+│  │  │ Memory               │  │ Gateway (rum-athena-gw)                   │  │  │
+│  │  │ rum_analysis_memory  │  │  └─ Target: athena-query                  │  │  │
+│  │  │ session_id =         │  │     └─ Lambda: rum-pipeline-athena-query  │  │  │
+│  │  │   x-user-sub         │  │        MCP Tool: query_athena(sql)        │  │  │
+│  │  │ (per-user isolation) │  │        → Athena SQL exec + result return  │  │  │
+│  │  └──────────────────────┘  └───────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -491,10 +593,80 @@ SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transfo
                               ▼               ▼               ▼
                           Grafana      CloudWatch       Agent UI
                        (Visualization) (Ops Monitoring) (AI Analysis)
-                                                              │
-                                                    Bedrock Claude Sonnet
-                                                    + Auto Athena SQL Generation
-                                                    + Per-User Memory
+```
+
+## AI Analysis Request Flow (User → AgentCore)
+
+```
+User (Browser)
+  │ POST /api/chat { prompt: "Show today's RUM status" }
+  ▼
+CloudFront (HTTPS) → Lambda@Edge (JWT verify, inject x-user-sub) → ALB (idle 180s)
+  │
+  ▼
+EC2 Next.js route.ts :3000 (SSE proxy, ~46 lines)
+  │ fetch("http://localhost:8080/invocations", { prompt, session_id: x-user-sub })
+  ▼
+EC2 proxy.py :8080 (systemd: rum-agent.service)
+  │ boto3.client("bedrock-agentcore").invoke_agent_runtime(
+  │     agentRuntimeArn=".../rumAnalysisAgent-...",
+  │     qualifier="rumAgentEndpoint",
+  │     payload=b'{"prompt":"...","session_id":"..."}'
+  │ )
+  │ → resp["response"].iter_chunks() → SSE relay
+  ▼
+AgentCore Runtime (managed, container: rum-agent:latest)
+  │ @app.entrypoint async def invoke()
+  │   ① MemoryHook: Load last 5 turns from AgentCore Memory (session_id=x-user-sub)
+  │   ② StreamingHook: Push tool execution status as SSE events
+  │   ③ Connect MCP Gateway (SigV4, discover Athena Query Lambda tool)
+  ▼
+Strands Agent (Claude Sonnet 4.6, Bedrock Converse API, native tool_use)
+  │
+  ├── [MCP Gateway] query_athena(sql)
+  │     → rum-athena-gw → Lambda:rum-pipeline-athena-query → Athena
+  │     → SQL: SELECT ... FROM rum_pipeline_db.rum_events WHERE year/month/day
+  │
+  ├── [boto3 direct] search_logs(log_group, pattern)    → CloudWatch Logs
+  ├── [boto3 direct] get_metrics(namespace, metric)     → CloudWatch Metrics
+  ├── [boto3 direct] describe_alarms(state)             → CloudWatch Alarms
+  ├── [boto3 direct] select_s3_object(key, expression)  → S3 Select
+  ├── [boto3 direct] get_table_schema(table)            → Glue Catalog
+  ├── [boto3 direct] create_grafana_annotation(text)    → Grafana API
+  └── [boto3 direct] publish_sns(message)               → SNS Publish
+  │
+  ▼
+SSE Response Stream (reverse path)
+  agent.py yield → AgentCore Runtime → proxy.py iter_chunks → route.ts passthrough → Browser
+    {"type": "start"}
+    {"type": "status", "content": "Athena analyzing..."}
+    {"type": "status", "content": "✅ Athena complete"}
+    {"type": "heartbeat"}                                   ← every 15s
+    {"type": "chunk", "content": "## Today's RUM Status..."} ← markdown report
+    {"type": "done"}
+```
+
+### AgentCore Gateway Configuration
+
+```
+rum-athena-gw (MCP protocol, IAM auth)
+  └── Target: athena-query (READY)
+        ├── Lambda: rum-pipeline-athena-query
+        │   (async Athena query: execute → poll → return results)
+        └── MCP Tool: query_athena
+              ├── Input: { "sql": "SELECT ... FROM rum_pipeline_db.rum_events WHERE ..." }
+              ├── Constraint: SELECT only, year/month/day partition filter required
+              └── Forbidden funcs: COUNTIF→COUNT_IF, SAFE_DIVIDE→TRY, IFNULL→COALESCE
+```
+
+### Per-User Isolation
+
+```
+User A (Cognito sub: "aaa") → Lambda@Edge x-user-sub: "aaa"
+  → proxy.py session_id: "aaa" → AgentCore Memory: loads/saves only User A's history
+
+User B (Cognito sub: "bbb") → Lambda@Edge x-user-sub: "bbb"
+  → proxy.py session_id: "bbb" → AgentCore Memory: loads/saves only User B's history
 ```
 
 ## Infrastructure
@@ -558,6 +730,8 @@ CDK commands: `cd cdk && npx cdk synth / deploy / diff`
 - Athena/Trino forbidden function list (COUNTIF, SAFE_DIVIDE, IFNULL, IF, GROUP_CONCAT) ensures SQL compatibility
 - Agent tool call limit (max 2 per round) prevents unnecessary API calls and optimizes cost
 - Agent UI PDF/Word report download implemented via DOM cloning without server-side rendering
-- agent.py runs as SSE streaming sidecar, route.ts acts as proxy (eliminates code duplication, single prompt/tool management)
+- EC2 proxy.py → AgentCore Runtime invoke API for agent calls (route.ts is SSE proxy only, eliminates code duplication)
+- MCP Gateway connects only Athena; remaining 7 tools use boto3 direct calls (only async queries need Lambda encapsulation)
+- AgentCore Runtime container deployment with ECR image versioning for zero-downtime updates
 
 <p align="right"><a href="#-한국어">🇰🇷 한국어 ↑</a></p>
