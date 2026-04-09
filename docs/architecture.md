@@ -214,20 +214,99 @@ Bedrock AgentCore 기반 AI 에이전트가 RUM 데이터를 분석.
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Data Flow Summary
+## End-to-End 데이터 플로우 (SDK → 분석)
 
 ```
-SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transform Lambda → S3 (Parquet)
-                                                                                      │
-                                              ┌───────────────────────────────────────┘
-                                              ▼
-                                   Glue Catalog ← Partition Repair (15분)
-                                              │
-                              ┌───────────────┼───────────────┐
-                              ▼               ▼               ▼
-                          Grafana      CloudWatch       Agent UI
-                         (시각화)      (운영 모니터링)   (AI 분석)
+                              ┌──────────────────────────┐
+                              │     클라이언트 (SDK)       │
+                              │  Web 60% / iOS 25%       │
+                              │  Android 15%             │
+                              └────────────┬─────────────┘
+                                           │ POST /v1/events
+                                           │ POST /v1/events/beacon
+                                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. 인제스트                                                                  │
+│                                                                             │
+│  WAF (Rate+Bot) → API Gateway (HTTP) → Lambda Authorizer (API Key/JWT)     │
+│                                           │                                 │
+│                                           ▼                                 │
+│                                    Lambda Ingest                            │
+│                                    (HTTP → Firehose PutRecord)              │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. 변환 + 저장                                                               │
+│                                                                             │
+│  Kinesis Firehose                                                           │
+│    │                                                                        │
+│    ├─ Lambda Transform (JSON 정규화, 스키마 검증, PII 제거)                    │
+│    │    → 파티션 키 생성: platform, year, month, day, hour                    │
+│    │    → JSON → Parquet 변환                                                │
+│    │                                                                        │
+│    ├─ 성공 → S3: raw/platform=web/year=2026/month=04/day=09/hour=10/        │
+│    └─ 실패 → S3: errors/year=2026/month=04/day=09/hour=10/{error-type}/     │
+│                                                                             │
+│  S3 Data Lake (단일 버킷, KMS 암호화)                                         │
+│    ├── raw/           ← Firehose 출력 (Parquet)                              │
+│    ├── aggregated/    ← 집계 데이터 (hourly/, daily/)                         │
+│    ├── athena-results/← Athena 쿼리 결과                                     │
+│    └── errors/        ← Firehose 변환 실패 레코드                             │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. 카탈로그 + 파티션                                                          │
+│                                                                             │
+│  Glue Catalog (rum_pipeline_db)                                             │
+│    ├── rum_events          ← S3 raw/ (5개 파티션 키)                         │
+│    ├── rum_hourly_metrics  ← S3 aggregated/hourly/                          │
+│    └── rum_daily_summary   ← S3 aggregated/daily/                           │
+│                                                                             │
+│  EventBridge (15분 간격) → Lambda Partition Repair                           │
+│    └── MSCK REPAIR TABLE → 신규 파티션 자동 등록                              │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                      ┌───────────────┼───────────────┐
+                      ▼               ▼               ▼
+┌───────────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐
+│ 4A. Grafana (시각화)    │ │ 4B. CloudWatch  │ │ 4C. AI Agent (분석)          │
+│                        │ │   (운영 모니터링)│ │                             │
+│ Athena Workgroup       │ │                 │ │ 사용자 자연어 질문            │
+│  └─ rum_pipeline_db    │ │ 대시보드 (22위젯)│ │  │                          │
+│     쿼리               │ │  ├ API 요청/에러 │ │  ▼                          │
+│                        │ │  ├ Lambda 호출   │ │ CF → Edge → ALB → EC2      │
+│ Amazon Managed Grafana │ │  ├ WAF 허용/차단 │ │  route.ts → proxy.py       │
+│  ├ 핵심 KPI (8)        │ │  └ Firehose 처리 │ │   → AgentCore Runtime      │
+│  ├ Core Web Vitals     │ │                 │ │                             │
+│  ├ 에러 & 크래시       │ │ 알람             │ │ Strands Agent              │
+│  ├ 리소스/네트워크      │ │  ├ Lambda 에러율 │ │ (Sonnet 4.6)               │
+│  ├ 모바일 바이탈       │ │  ├ Firehose 지연 │ │  ├ query_athena (Gateway)  │
+│  ├ 사용자/세션 탐색기   │ │  └ API 5xx      │ │  │  └ Athena SQL 자동 생성  │
+│  └ 43패널 9섹션 (KST) │ │                 │ │  ├ search_logs (CW Logs)  │
+│                        │ │ SNS 알림         │ │  ├ get_metrics (CW)       │
+│ SSO 인증               │ │  └ 이메일/슬랙   │ │  ├ describe_alarms (CW)   │
+│                        │ │                 │ │  ├ select_s3_object (S3)  │
+│ ◀── Athena 직접 쿼리   │ │ ◀── 메트릭 수집  │ │  ├ get_table_schema (Glue)│
+│     (S3 Parquet 스캔)  │ │     (Lambda,    │ │  ├ grafana_annotation     │
+│                        │ │      API GW,    │ │  └ publish_sns            │
+│                        │ │      Firehose)  │ │                             │
+│                        │ │                 │ │ ◀── S3 + CW + Glue +      │
+│                        │ │                 │ │     Grafana 교차 분석       │
+└───────────────────────┘ └─────────────────┘ └─────────────────────────────┘
 ```
+
+### 세 분석 경로 비교
+
+| | Grafana | CloudWatch | AI Agent |
+|--|---------|------------|----------|
+| **데이터 소스** | S3 Parquet (Athena) | AWS 서비스 메트릭/로그 | S3 + CW + Glue + Grafana (복합) |
+| **쿼리 방식** | 미리 정의된 43개 패널 | 자동 수집 메트릭 | 자연어 → SQL 자동 생성 |
+| **시간 범위** | 사용자 선택 (KST) | 실시간 ~14일 | 질문에 따라 동적 |
+| **사용자** | 운영팀 (대시보드 관찰) | 온콜 (알람 대응) | 누구나 (자연어 질문) |
+| **업데이트** | 수동 새로고침 | 실시간 (1분) | 질문할 때마다 |
+| **인사이트** | 시각적 패턴 인식 | 임계값 기반 알람 | AI가 분석 + 개선 제안 |
 
 ## AI 분석 요청 흐름 (사용자 → AgentCore)
 
@@ -580,20 +659,100 @@ A Bedrock AgentCore-based AI agent analyzes the RUM data.
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Data Flow Summary
+## End-to-End Data Flow (SDK → Analysis)
 
 ```
-SDK → WAF → API GW → Authorizer → Ingest Lambda → Firehose → Transform Lambda → S3 (Parquet)
-                                                                                      │
-                                              ┌───────────────────────────────────────┘
-                                              ▼
-                                   Glue Catalog ← Partition Repair (15 min)
-                                              │
-                              ┌───────────────┼───────────────┐
-                              ▼               ▼               ▼
-                          Grafana      CloudWatch       Agent UI
-                       (Visualization) (Ops Monitoring) (AI Analysis)
+                              ┌──────────────────────────┐
+                              │     Clients (SDK)         │
+                              │  Web 60% / iOS 25%       │
+                              │  Android 15%             │
+                              └────────────┬─────────────┘
+                                           │ POST /v1/events
+                                           │ POST /v1/events/beacon
+                                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. Ingestion                                                                │
+│                                                                             │
+│  WAF (Rate+Bot) → API Gateway (HTTP) → Lambda Authorizer (API Key/JWT)     │
+│                                           │                                 │
+│                                           ▼                                 │
+│                                    Lambda Ingest                            │
+│                                    (HTTP → Firehose PutRecord)              │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. Transform + Storage                                                      │
+│                                                                             │
+│  Kinesis Firehose                                                           │
+│    │                                                                        │
+│    ├─ Lambda Transform (JSON normalize, schema validate, PII removal)      │
+│    │    → Partition keys: platform, year, month, day, hour                  │
+│    │    → JSON → Parquet conversion                                         │
+│    │                                                                        │
+│    ├─ Success → S3: raw/platform=web/year=2026/month=04/day=09/hour=10/    │
+│    └─ Failure → S3: errors/year=2026/month=04/day=09/hour=10/{error-type}/ │
+│                                                                             │
+│  S3 Data Lake (single bucket, KMS encrypted)                                │
+│    ├── raw/           ← Firehose output (Parquet)                           │
+│    ├── aggregated/    ← Aggregated data (hourly/, daily/)                   │
+│    ├── athena-results/← Athena query results                                │
+│    └── errors/        ← Firehose transform failure records                  │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. Catalog + Partitions                                                     │
+│                                                                             │
+│  Glue Catalog (rum_pipeline_db)                                             │
+│    ├── rum_events          ← S3 raw/ (5 partition keys)                    │
+│    ├── rum_hourly_metrics  ← S3 aggregated/hourly/                          │
+│    └── rum_daily_summary   ← S3 aggregated/daily/                           │
+│                                                                             │
+│  EventBridge (every 15 min) → Lambda Partition Repair                       │
+│    └── MSCK REPAIR TABLE → auto-register new partitions                     │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                      ┌───────────────┼───────────────┐
+                      ▼               ▼               ▼
+┌───────────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐
+│ 4A. Grafana            │ │ 4B. CloudWatch  │ │ 4C. AI Agent               │
+│   (Visualization)      │ │ (Ops Monitoring)│ │   (Analysis)               │
+│                        │ │                 │ │                             │
+│ Athena Workgroup       │ │ Dashboard (22w) │ │ User natural language query │
+│  └─ rum_pipeline_db    │ │  ├ API req/err  │ │  │                          │
+│     queries            │ │  ├ Lambda inv   │ │  ▼                          │
+│                        │ │  ├ WAF allow/   │ │ CF → Edge → ALB → EC2      │
+│ Amazon Managed Grafana │ │  │ block        │ │  route.ts → proxy.py       │
+│  ├ KPI (8 stats)       │ │  └ Firehose I/O │ │   → AgentCore Runtime      │
+│  ├ Core Web Vitals     │ │                 │ │                             │
+│  ├ Errors & Crashes    │ │ Alarms          │ │ Strands Agent              │
+│  ├ Resources/Network   │ │  ├ Lambda errs  │ │ (Sonnet 4.6)               │
+│  ├ Mobile Vitals       │ │  ├ Firehose lag │ │  ├ query_athena (Gateway)  │
+│  ├ User/Session Expl.  │ │  └ API 5xx     │ │  │  └ Auto SQL generation   │
+│  └ 43 panels, 9 sec.  │ │                 │ │  ├ search_logs (CW Logs)  │
+│    (KST timezone)      │ │ SNS Alerts      │ │  ├ get_metrics (CW)       │
+│                        │ │  └ Email/Slack  │ │  ├ describe_alarms (CW)   │
+│ SSO Auth               │ │                 │ │  ├ select_s3_object (S3)  │
+│                        │ │                 │ │  ├ get_table_schema (Glue)│
+│ ◀── Athena queries     │ │ ◀── Auto-       │ │  ├ grafana_annotation     │
+│     (S3 Parquet scan)  │ │     collected   │ │  └ publish_sns            │
+│                        │ │     metrics     │ │                             │
+│                        │ │                 │ │ ◀── S3 + CW + Glue +      │
+│                        │ │                 │ │     Grafana cross-analysis  │
+└───────────────────────┘ └─────────────────┘ └─────────────────────────────┘
 ```
+
+### Three Analysis Paths Compared
+
+| | Grafana | CloudWatch | AI Agent |
+|--|---------|------------|----------|
+| **Data Source** | S3 Parquet (Athena) | AWS service metrics/logs | S3 + CW + Glue + Grafana (composite) |
+| **Query Method** | Pre-defined 43 panels | Auto-collected metrics | Natural language → auto SQL generation |
+| **Time Range** | User-selected (KST) | Real-time ~14 days | Dynamic per question |
+| **Users** | Ops team (dashboard observation) | On-call (alarm response) | Anyone (natural language) |
+| **Updates** | Manual refresh | Real-time (1 min) | On every question |
+| **Insights** | Visual pattern recognition | Threshold-based alarms | AI analysis + improvement suggestions |
 
 ## AI Analysis Request Flow (User → AgentCore)
 
