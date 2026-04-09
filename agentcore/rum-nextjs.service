@@ -1,0 +1,18 @@
+[Unit]
+Description=RUM Agent UI (Next.js 14, port 3000)
+After=network.target rum-agent.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rum-agent-ui
+EnvironmentFile=/opt/rum-agent-ui/.env
+ExecStart=/usr/bin/npx next start -p 3000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rum-nextjs
+
+[Install]
+WantedBy=multi-user.target
