@@ -31,6 +31,40 @@ The pipeline processes approximately 1.8M events/day for 50K DAU at an estimated
 - **SSO Authentication** — CloudFront + Lambda@Edge + Cognito SSO for Agent UI access control with per-user memory.
 - **Session Replay** — Self-hosted OpenReplay integration via CloudFront + ALB + EC2 with RDS, Redis, and S3 backend.
 
+## Screenshots
+
+### AI Analysis Agent (Bedrock AgentCore + Claude Sonnet 4.6)
+
+Natural language RUM data analysis with auto-generated Athena SQL, multi-tool orchestration, and Korean markdown reports.
+
+| Chat Interface | PDF/Word Report |
+|:-:|:-:|
+| ![AI Agent Chat](screen-shot/rum-pipeline-ai-agent01.png) | ![AI Agent Report](screen-shot/rum-pipeline-ai-agent02.png) |
+
+### Grafana Dashboard (43 Panels, 9 Sections)
+
+Real-time KPIs, Core Web Vitals gauges, error/crash trends, mobile vitals, and session explorer.
+
+| KPI & Core Web Vitals | Errors & Network |
+|:-:|:-:|
+| ![Grafana KPI](screen-shot/rum-pipeline-grafana01.png) | ![Grafana Errors](screen-shot/rum-pipeline-grafana02.png) |
+
+| Mobile Vitals & User Analysis |
+|:-:|
+| ![Grafana Mobile](screen-shot/rum-pipeline-grafana03.png) |
+
+### CloudWatch Operations Dashboard (22 Widgets)
+
+API Gateway, Lambda, WAF, and Firehose operational metrics with alarms.
+
+| API & Lambda Metrics | Lambda Duration & WAF & Firehose |
+|:-:|:-:|
+| ![CW Dashboard](screen-shot/rum-pipeline-cw01.png) | ![CW Lambda](screen-shot/rum-pipeline-cw02.png) |
+
+| WAF & Firehose Metrics |
+|:-:|
+| ![CW WAF Firehose](screen-shot/rum-pipeline-cw03.png) |
+
 ## Prerequisites
 
 | Tool | Version | Purpose |
@@ -235,6 +269,40 @@ DAU 5만 기준 약 180만 이벤트/일을 처리하며, 예상 비용은 월 ~
 - **Infrastructure as Code** — Terraform(12개 모듈)과 AWS CDK(12개 Construct) 듀얼 IaC 지원
 - **SSO 인증** — CloudFront + Lambda@Edge + Cognito SSO로 Agent UI 접근 제어 및 사용자별 메모리
 - **세션 리플레이** — CloudFront + ALB + EC2 기반 셀프호스팅 OpenReplay 연동 (RDS, Redis, S3 백엔드)
+
+## 스크린샷
+
+### AI 분석 에이전트 (Bedrock AgentCore + Claude Sonnet 4.6)
+
+자연어로 RUM 데이터 분석. Athena SQL 자동 생성, 멀티 도구 오케스트레이션, 한국어 마크다운 리포트.
+
+| 채팅 인터페이스 | PDF/Word 리포트 |
+|:-:|:-:|
+| ![AI Agent Chat](screen-shot/rum-pipeline-ai-agent01.png) | ![AI Agent Report](screen-shot/rum-pipeline-ai-agent02.png) |
+
+### Grafana 대시보드 (43개 패널, 9개 섹션)
+
+실시간 KPI, Core Web Vitals 게이지, 에러/크래시 추이, 모바일 바이탈, 세션 탐색기.
+
+| KPI & Core Web Vitals | 에러 & 네트워크 |
+|:-:|:-:|
+| ![Grafana KPI](screen-shot/rum-pipeline-grafana01.png) | ![Grafana Errors](screen-shot/rum-pipeline-grafana02.png) |
+
+| 모바일 바이탈 & 사용자 분석 |
+|:-:|
+| ![Grafana Mobile](screen-shot/rum-pipeline-grafana03.png) |
+
+### CloudWatch 운영 대시보드 (22개 위젯)
+
+API Gateway, Lambda, WAF, Firehose 운영 메트릭 및 알람.
+
+| API & Lambda 메트릭 | Lambda 실행시간 & WAF & Firehose |
+|:-:|:-:|
+| ![CW Dashboard](screen-shot/rum-pipeline-cw01.png) | ![CW Lambda](screen-shot/rum-pipeline-cw02.png) |
+
+| WAF & Firehose 메트릭 |
+|:-:|
+| ![CW WAF Firehose](screen-shot/rum-pipeline-cw03.png) |
 
 ## 사전 요구 사항
 
