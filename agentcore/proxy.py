@@ -38,9 +38,14 @@ logger.info(f"Runtime ARN: {RUNTIME_ARN}")
 logger.info(f"Endpoint: {ENDPOINT_NAME}")
 
 
+# CloudFront는 ~4KB 이하의 응답을 버퍼링함. 패딩으로 즉시 플러시 유도.
+_PADDING = b": " + b"x" * 4000 + b"\n\n"
+
+
 def _sse(data: dict) -> bytes:
-    """SSE 이벤트 포맷."""
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+    """SSE 이벤트 + 4KB 패딩 (CloudFront 버퍼 플러시)."""
+    event = f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+    return event + _PADDING
 
 
 def _invoke_runtime(payload_bytes):
@@ -120,12 +125,14 @@ async def handle_invocation(request: Request):
 
         logger.info(f"[{session_id}] Streaming from Runtime...")
 
+        yield _sse({"type": "status", "content": "\U0001f4e1 AgentCore 응답 수신 중..."})
+
         try:
             body_stream = resp.get("response")  # StreamingBody
             if body_stream:
                 for chunk in body_stream.iter_chunks(chunk_size=4096):
                     if chunk:
-                        yield chunk
+                        yield chunk + _PADDING
         except Exception as e:
             logger.error(f"[{session_id}] Stream error: {e}")
             error = json.dumps({"type": "error", "content": str(e)})
