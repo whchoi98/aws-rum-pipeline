@@ -158,6 +158,10 @@ aws-rum-pipeline/
 ├── mobile-sdk-android/           # Android RUM SDK (Kotlin 1.9, Gradle)
 ├── simulator/                    # Traffic generator (TypeScript, Docker, EKS)
 ├── agentcore/                    # Bedrock AgentCore AI agent + Next.js UI
+│   ├── agent.py                  # Strands Agent (Sonnet 4.6) — runs in AgentCore Runtime
+│   ├── proxy.py                  # EC2 HTTP proxy → AgentCore Runtime (port 8080)
+│   ├── rum-agent.service         # systemd service for proxy.py
+│   └── web-app/                  # Next.js 14 Chat UI (route.ts = SSE proxy)
 ├── cdk/                          # AWS CDK (TypeScript) — Terraform alternative
 ├── scripts/                      # Build/deploy/test scripts
 ├── tests/                        # Harness validation tests (TAP-style)
@@ -359,6 +363,10 @@ aws-rum-pipeline/
 ├── mobile-sdk-android/           # Android RUM SDK (Kotlin 1.9, Gradle)
 ├── simulator/                    # 트래픽 생성기 (TypeScript, Docker, EKS)
 ├── agentcore/                    # Bedrock AgentCore AI 에이전트 + Next.js UI
+│   ├── agent.py                  # Strands Agent (Sonnet 4.6) — AgentCore Runtime에서 실행
+│   ├── proxy.py                  # EC2 HTTP 프록시 → AgentCore Runtime (port 8080)
+│   ├── rum-agent.service         # proxy.py systemd 서비스
+│   └── web-app/                  # Next.js 14 Chat UI (route.ts = SSE 프록시)
 ├── cdk/                          # AWS CDK (TypeScript) — Terraform 대안
 ├── scripts/                      # 빌드/배포/테스트 스크립트
 ├── tests/                        # 하네스 검증 테스트 (TAP 스타일)

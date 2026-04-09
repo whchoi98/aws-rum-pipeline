@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AgentCore Runtime integration: proxy.py HTTP proxy on EC2 calls AgentCore Runtime via boto3 `invoke-agent-runtime`, SSE streaming relay
+- `proxy.py` lightweight HTTP proxy (Starlette/uvicorn, port 8080) replaces direct Bedrock InvokeModel in route.ts
+- `rum-agent.service` systemd service for proxy.py on EC2
+- `StreamingHook` (Strands HookProvider) for real-time tool execution status events (BeforeToolCallEvent/AfterToolCallEvent)
+- `run_agent()` function with MCP context manager wrapping to fix MCPClientInitializationError
+- End-to-end data flow diagram in architecture.md (SDK → Ingestion → Storage → Grafana/CW/AI Agent)
+- AI analysis request flow diagram (User → CloudFront → EC2 → AgentCore Runtime → Strands Agent → 8 tools)
+- AgentCore Gateway configuration details (rum-athena-gw, MCP Tool, forbidden functions)
+- Three analysis paths comparison table (Grafana vs CloudWatch vs AI Agent)
+- Per-user isolation flow diagram (x-user-sub → session_id → AgentCore Memory)
+
+### Changed
+
+- `route.ts` reduced from 313 lines to 46 lines (SSE proxy to localhost:8080, removed Bedrock direct calls)
+- `agent.py` entrypoint converted from sync return to async streaming generator with heartbeat (15s)
+- `agent.py` `create_agent()` refactored to `run_agent()` — creates + executes agent inside MCP context manager
+- Removed 6 AWS SDK packages from web-app: @aws-sdk/client-lambda, bedrock-runtime, cloudwatch-logs, cloudwatch, glue, sns
+- Agent UI architecture: tag-based XML orchestration replaced with Strands native tool_use via AgentCore Runtime
+- AgentCore Runtime container updated to v3 (ECR image rebuild with streaming + MCP fix)
+- Terraform agent-ui user_data: added pip3 install + rum-agent systemd service registration
+
+### Removed
+
+- Agent UI direct Bedrock InvokeModel calls (replaced by AgentCore Runtime invoke)
+- Agent UI 7 tool functions in route.ts (queryAthena, searchLogs, getMetrics, etc.)
+- Agent UI XML tag parsing (extractToolTags, runTool, stripTags)
+- Agent UI SYSTEM_PROMPT duplicate in route.ts (single source in agent.py)
+
+---
+
 - OpenReplay self-hosted session replay module: CloudFront + ALB + EC2 + RDS (PostgreSQL) + ElastiCache (Redis) + S3
 - CDK `OpenReplay` Construct with 1:1 mapping to Terraform openreplay module
 - TAP-style harness validation test suite (`tests/run-all.sh`) with 108 tests covering hooks, structure, secret patterns, and content quality
@@ -179,6 +209,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- AgentCore Runtime 통합: EC2 proxy.py HTTP 프록시가 boto3 `invoke-agent-runtime`으로 AgentCore Runtime 호출, SSE 스트리밍 중계
+- `proxy.py` 경량 HTTP 프록시 (Starlette/uvicorn, port 8080) — route.ts의 Bedrock InvokeModel 직접 호출 대체
+- `rum-agent.service` systemd 서비스로 proxy.py EC2 상시 실행
+- `StreamingHook` (Strands HookProvider) — BeforeToolCallEvent/AfterToolCallEvent로 도구 실행 상태 실시간 전달
+- `run_agent()` 함수 + MCP 컨텍스트 매니저 래핑으로 MCPClientInitializationError 해결
+- architecture.md에 End-to-End 데이터 플로우 다이어그램 (SDK → 인제스트 → 저장 → Grafana/CW/AI Agent)
+- AI 분석 요청 흐름 다이어그램 (사용자 → CloudFront → EC2 → AgentCore Runtime → Strands Agent → 8개 도구)
+- AgentCore Gateway 구성 상세 (rum-athena-gw, MCP Tool, 금지 함수)
+- 세 분석 경로 비교표 (Grafana vs CloudWatch vs AI Agent)
+- 사용자별 격리 흐름 다이어그램 (x-user-sub → session_id → AgentCore Memory)
+
+### Changed
+
+- `route.ts` 313줄 → 46줄로 축소 (localhost:8080 SSE 프록시, Bedrock 직접 호출 제거)
+- `agent.py` entrypoint를 동기 반환에서 비동기 스트리밍 generator로 변환 (heartbeat 15초)
+- `agent.py` `create_agent()` → `run_agent()`으로 리팩터 — MCP 컨텍스트 매니저 안에서 에이전트 생성+실행
+- web-app에서 AWS SDK 6개 패키지 제거: @aws-sdk/client-lambda, bedrock-runtime, cloudwatch-logs, cloudwatch, glue, sns
+- Agent UI 아키텍처: XML 태그 기반 오케스트레이션 → AgentCore Runtime 경유 Strands 네이티브 tool_use로 전환
+- AgentCore Runtime 컨테이너 v3 업데이트 (ECR 이미지 재빌드: 스트리밍 + MCP 수정 반영)
+- Terraform agent-ui user_data: pip3 설치 + rum-agent systemd 서비스 등록 추가
+
+### Removed
+
+- Agent UI의 Bedrock InvokeModel 직접 호출 (AgentCore Runtime invoke로 대체)
+- route.ts의 7개 도구 함수 (queryAthena, searchLogs, getMetrics 등)
+- route.ts의 XML 태그 파싱 (extractToolTags, runTool, stripTags)
+- route.ts의 SYSTEM_PROMPT 중복 (agent.py에서 단일 관리)
+
+---
 
 - OpenReplay 셀프호스팅 세션 리플레이 모듈: CloudFront + ALB + EC2 + RDS (PostgreSQL) + ElastiCache (Redis) + S3
 - Terraform openreplay 모듈과 1:1 대응하는 CDK `OpenReplay` Construct
