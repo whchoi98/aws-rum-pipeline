@@ -1,5 +1,5 @@
 [Unit]
-Description=RUM AgentCore Agent (Strands + Bedrock Sonnet 4.6)
+Description=RUM AgentCore HTTP Proxy (route.ts → AgentCore Runtime SSE)
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User=ec2-user
 WorkingDirectory=/opt/rum-agent-ui/agentcore
 EnvironmentFile=/opt/rum-agent-ui/.env
-ExecStart=/usr/bin/python3 agent.py
+ExecStart=/usr/bin/python3 proxy.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
