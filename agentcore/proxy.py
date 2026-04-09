@@ -38,6 +38,11 @@ logger.info(f"Runtime ARN: {RUNTIME_ARN}")
 logger.info(f"Endpoint: {ENDPOINT_NAME}")
 
 
+def _sse(data: dict) -> bytes:
+    """SSE 이벤트 포맷."""
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+
+
 def _invoke_runtime(payload_bytes):
     """동기 boto3 호출 (스레드에서 실행)."""
     kwargs = {
@@ -65,19 +70,38 @@ async def handle_invocation(request: Request):
 
     async def stream():
         # 즉시 첫 이벤트 전송 → CloudFront 60초 타임아웃 방지
-        yield b"data: {\"type\":\"start\"}\n\n"
-        yield b"data: {\"type\":\"status\",\"content\":\"\\ud83d\\udd0d \\ubd84\\uc11d \\uc911... \\ub9ac\\ud3ec\\ud2b8\\ub97c \\uc0dd\\uc131\\uc911\\uc785\\ub2c8\\ub2e4.\"}\n\n"
+        yield _sse({"type": "start"})
+        yield _sse({"type": "status", "content": "\U0001f50d AgentCore Runtime 연결 중..."})
 
-        # invoke를 스레드에서 실행 + 대기 중 heartbeat
+        # invoke를 스레드에서 실행 + 대기 중 진행 상태 표시
         loop = asyncio.get_event_loop()
         future = loop.run_in_executor(_executor, _invoke_runtime, payload_bytes)
 
+        elapsed = 0
+        PROGRESS_MSGS = [
+            (5,  "\u2699\ufe0f 에이전트 초기화 중... (대화 히스토리 로드)"),
+            (15, "\U0001f9e0 Claude Sonnet 4.6 모델 추론 중..."),
+            (30, "\U0001f4ca 도구 실행 중... (Athena SQL 생성/실행)"),
+            (50, "\u23f3 분석 데이터 수집 중... 잠시만 기다려주세요."),
+            (70, "\U0001f4dd 결과 정리 중..."),
+        ]
+        msg_idx = 0
         last_hb = time.time()
+
         while not future.done():
+            elapsed += 0.5
+
+            # 단계별 진행 메시지
+            if msg_idx < len(PROGRESS_MSGS) and elapsed >= PROGRESS_MSGS[msg_idx][0]:
+                yield _sse({"type": "status", "content": PROGRESS_MSGS[msg_idx][1]})
+                msg_idx += 1
+
+            # 15초 간격 heartbeat (SSE 주석 — 연결 유지용)
             now = time.time()
             if now - last_hb > 15:
                 yield b": heartbeat\n\n"
                 last_hb = now
+
             await asyncio.sleep(0.5)
 
         try:
