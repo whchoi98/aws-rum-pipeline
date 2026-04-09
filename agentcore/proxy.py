@@ -8,6 +8,8 @@ route.ts → POST localhost:8080/invocations → boto3 invoke-agent-runtime → 
 import json
 import os
 import logging
+import time
+import concurrent.futures
 
 import boto3
 from starlette.applications import Starlette
@@ -15,6 +17,7 @@ from starlette.routing import Route
 from starlette.requests import Request
 from starlette.responses import StreamingResponse, JSONResponse
 import uvicorn
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,9 +32,21 @@ RUNTIME_ARN = _parts[0] if _parts else ""
 ENDPOINT_NAME = _parts[1] if len(_parts) > 1 else None
 
 agentcore_client = boto3.client("bedrock-agentcore", region_name=REGION)
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 logger.info(f"Runtime ARN: {RUNTIME_ARN}")
 logger.info(f"Endpoint: {ENDPOINT_NAME}")
+
+
+def _invoke_runtime(payload_bytes):
+    """동기 boto3 호출 (스레드에서 실행)."""
+    kwargs = {
+        "agentRuntimeArn": RUNTIME_ARN,
+        "payload": payload_bytes,
+    }
+    if ENDPOINT_NAME:
+        kwargs["qualifier"] = ENDPOINT_NAME
+    return agentcore_client.invoke_agent_runtime(**kwargs)
 
 
 async def handle_invocation(request: Request):
@@ -48,26 +63,39 @@ async def handle_invocation(request: Request):
 
     payload_bytes = json.dumps({"prompt": prompt, "session_id": session_id}).encode()
 
-    try:
-        kwargs = {
-            "agentRuntimeArn": RUNTIME_ARN,
-            "payload": payload_bytes,
-        }
-        if ENDPOINT_NAME:
-            kwargs["qualifier"] = ENDPOINT_NAME
-
-        resp = agentcore_client.invoke_agent_runtime(**kwargs)
-    except Exception as e:
-        logger.error(f"[{session_id}] invoke 실패: {e}")
-        return JSONResponse({"error": str(e)}, status_code=502)
-
-    status_code = resp.get("statusCode", 200)
-    if status_code != 200:
-        return JSONResponse({"error": f"Runtime returned {status_code}"}, status_code=502)
-
-    logger.info(f"[{session_id}] Streaming from Runtime...")
-
     async def stream():
+        # 즉시 첫 이벤트 전송 → CloudFront 60초 타임아웃 방지
+        yield b"data: {\"type\":\"start\"}\n\n"
+        yield b"data: {\"type\":\"status\",\"content\":\"\\ud83d\\udd0d \\ubd84\\uc11d \\uc911... \\ub9ac\\ud3ec\\ud2b8\\ub97c \\uc0dd\\uc131\\uc911\\uc785\\ub2c8\\ub2e4.\"}\n\n"
+
+        # invoke를 스레드에서 실행 + 대기 중 heartbeat
+        loop = asyncio.get_event_loop()
+        future = loop.run_in_executor(_executor, _invoke_runtime, payload_bytes)
+
+        last_hb = time.time()
+        while not future.done():
+            now = time.time()
+            if now - last_hb > 15:
+                yield b": heartbeat\n\n"
+                last_hb = now
+            await asyncio.sleep(0.5)
+
+        try:
+            resp = future.result()
+        except Exception as e:
+            logger.error(f"[{session_id}] invoke 실패: {e}")
+            error = json.dumps({"type": "error", "content": str(e)})
+            yield f"data: {error}\n\n".encode()
+            return
+
+        status_code = resp.get("statusCode", 200)
+        if status_code != 200:
+            error = json.dumps({"type": "error", "content": f"Runtime returned {status_code}"})
+            yield f"data: {error}\n\n".encode()
+            return
+
+        logger.info(f"[{session_id}] Streaming from Runtime...")
+
         try:
             body_stream = resp.get("response")  # StreamingBody
             if body_stream:
