@@ -170,6 +170,7 @@ export default function Home() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState('');
+  const [statusMsg, setStatusMsg] = useState('');
   const [sessionId] = useState(() => `session-${Date.now()}`);
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -224,11 +225,17 @@ export default function Home() {
               try {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === 'chunk') {
+                  setStatusMsg('');
                   accumulated += data.content;
                   setStreaming(accumulated);
+                } else if (data.type === 'status') {
+                  setStatusMsg(data.content || '');
                 } else if (data.type === 'error') {
+                  setStatusMsg('');
                   accumulated += `\n\n\u26A0\uFE0F 오류: ${data.content}`;
                   setStreaming(accumulated);
+                } else if (data.type === 'done') {
+                  setStatusMsg('');
                 }
               } catch {
                 // JSON 파싱 실패
@@ -246,6 +253,7 @@ export default function Home() {
         { role: 'bot', content: `\u26A0\uFE0F 연결 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}` },
       ]);
       setStreaming('');
+      setStatusMsg('');
     }
     setLoading(false);
   };
@@ -287,6 +295,7 @@ export default function Home() {
           <div style={styles.message}>
             <div style={{ ...styles.avatar, background: '#1f6feb' }}>{'\uD83E\uDD16'}</div>
             <div style={styles.botBubble}>
+              {statusMsg && <div style={{ color: '#8b949e', fontSize: '13px', marginBottom: '8px' }}>{statusMsg}</div>}
               <div className="markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{streaming}</ReactMarkdown>
               </div>
@@ -296,7 +305,9 @@ export default function Home() {
         {loading && !streaming && (
           <div style={styles.message}>
             <div style={{ ...styles.avatar, background: '#1f6feb' }}>{'\uD83E\uDD16'}</div>
-            <div style={styles.botBubble}>분석 중...</div>
+            <div style={styles.botBubble}>
+              {statusMsg || '분석 중...'}
+            </div>
           </div>
         )}
       </div>
